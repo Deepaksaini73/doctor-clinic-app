@@ -163,13 +163,13 @@ export default function LoginPage() {
           <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</p>
           <div className="text-xs text-blue-800 space-y-1">
             <p>
-              <strong>Admin:</strong> admin@clinicare.com / admin123
+              <strong>Admin:</strong> admin@clinic.com / admin123
             </p>
             <p>
-              <strong>Doctor:</strong> doctor@clinicare.com / doctor123
+              <strong>Doctor:</strong> sarah@clinic.com / doctor123
             </p>
             <p>
-              <strong>Receptionist:</strong> receptionist@clinicare.com / receptionist123
+              <strong>Receptionist:</strong> receptionist@clinic.com / password123
             </p>
           </div>
         </div>
