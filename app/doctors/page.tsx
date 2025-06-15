@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Edit, Trash2, Search, UserCheck, Calendar, Clock, Star } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import MainLayout from "@/components/layout/main-layout"
+import { ref, onValue, push, remove, DataSnapshot } from "firebase/database"
+import { database } from "@/lib/firebase"
 
 interface Doctor {
   id: string
@@ -31,60 +33,7 @@ interface Doctor {
 }
 
 export default function DoctorsPage() {
-  const [doctors, setDoctors] = useState<Doctor[]>([
-    {
-      id: "1",
-      name: "Dr. Sarah Johnson",
-      email: "sarah.johnson@clinicare.com",
-      specialization: "Cardiology",
-      phone: "+1 234 567 8901",
-      experience: 12,
-      qualification: "MD, FACC",
-      availability: {
-        days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        hours: "9:00 AM - 5:00 PM",
-      },
-      rating: 4.8,
-      totalPatients: 245,
-      status: "active",
-      joinDate: "2020-03-15",
-    },
-    {
-      id: "2",
-      name: "Dr. Michael Chen",
-      email: "michael.chen@clinicare.com",
-      specialization: "Neurology",
-      phone: "+1 234 567 8902",
-      experience: 8,
-      qualification: "MD, PhD",
-      availability: {
-        days: ["Monday", "Wednesday", "Friday"],
-        hours: "10:00 AM - 6:00 PM",
-      },
-      rating: 4.9,
-      totalPatients: 189,
-      status: "active",
-      joinDate: "2021-07-20",
-    },
-    {
-      id: "3",
-      name: "Dr. Emily Rodriguez",
-      email: "emily.rodriguez@clinicare.com",
-      specialization: "Pediatrics",
-      phone: "+1 234 567 8903",
-      experience: 6,
-      qualification: "MD, FAAP",
-      availability: {
-        days: ["Tuesday", "Thursday", "Saturday"],
-        hours: "8:00 AM - 4:00 PM",
-      },
-      rating: 4.7,
-      totalPatients: 312,
-      status: "active",
-      joinDate: "2022-01-10",
-    },
-  ])
-
+  const [doctors, setDoctors] = useState<Doctor[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [filterSpecialization, setFilterSpecialization] = useState("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -117,10 +66,29 @@ export default function DoctorsPage() {
 
   const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
+  useEffect(() => {
+    const doctorsRef = ref(database, 'doctors');
+    const unsubscribe = onValue(doctorsRef, (snapshot: DataSnapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const doctorsList = Object.entries(data).map(([id, doctor]: [string, any]) => ({
+          id,
+          ...doctor
+        }));
+        setDoctors(doctorsList);
+      } else {
+        setDoctors([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const filteredDoctors = doctors.filter((doctor) => {
     const matchesSearch =
       doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+      doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctor.phone.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesSpecialization = filterSpecialization === "all" || doctor.specialization === filterSpecialization
     return matchesSearch && matchesSpecialization
   })
@@ -153,7 +121,9 @@ export default function DoctorsPage() {
       joinDate: new Date().toISOString().split("T")[0],
     }
 
-    setDoctors([...doctors, doctor])
+    const doctorsRef = ref(database, 'doctors');
+    push(doctorsRef, doctor);
+
     setNewDoctor({
       name: "",
       email: "",
@@ -173,11 +143,20 @@ export default function DoctorsPage() {
   }
 
   const handleDeleteDoctor = (id: string) => {
-    setDoctors(doctors.filter((doctor) => doctor.id !== id))
+    const doctorRef = ref(database, `doctors/${id}`);
+    if (!doctorRef) {
+      toast({
+        title: "Error",
+        description: "Doctor not found",
+        variant: "destructive",
+      });
+      return;
+    }
+    remove(doctorRef);
     toast({
       title: "Success",
       description: "Doctor removed successfully",
-    })
+    });
   }
 
   const handleToggleStatus = (id: string) => {
@@ -318,7 +297,7 @@ export default function DoctorsPage() {
                           id="phone"
                           value={newDoctor.phone}
                           onChange={(e) => setNewDoctor({ ...newDoctor, phone: e.target.value })}
-                          placeholder="+1 234 567 8900"
+                          placeholder="+91 9667737373"
                         />
                       </div>
                     </div>
