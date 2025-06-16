@@ -14,6 +14,8 @@ import type { Doctor } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { database } from "@/lib/firebase"
+import { ref, push, get, set } from "firebase/database"
 
 const formSchema = z.object({
   patientName: z.string().min(2, { message: "Patient name is required" }),
@@ -43,7 +45,7 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
     resolver: zodResolver(formSchema),
     defaultValues: {
       patientName: "",
-      patientAge: undefined,
+      patientAge: 0,
       symptoms: "",
       doctorId: "",
       priority: "routine",
@@ -52,13 +54,19 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
   })
 
   useEffect(() => {
-    // Fetch doctors
+    // Fetch doctors from Firebase
     const fetchDoctors = async () => {
       try {
-        const response = await fetch("/api/doctors")
-        if (!response.ok) throw new Error("Failed to fetch doctors")
-        const data = await response.json()
-        setDoctors(data)
+        const doctorsRef = ref(database, 'doctors')
+        const snapshot = await get(doctorsRef)
+        if (snapshot.exists()) {
+          const doctorsData = snapshot.val()
+          const doctorsArray = Object.entries(doctorsData).map(([id, data]: [string, any]) => ({
+            id,
+            ...data
+          }))
+          setDoctors(doctorsArray)
+        }
       } catch (error) {
         console.error("Error fetching doctors:", error)
         toast({
@@ -156,21 +164,13 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
         status: "scheduled",
         priority: data.priority,
         notes: data.notes,
+        createdAt: new Date().toISOString()
       }
 
-      // This is where you would integrate with your MCP server
-      // For now, we'll use the mock API
-      const response = await fetch("/api/appointments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(appointmentData),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to create appointment")
-      }
+      // Save to Firebase
+      const appointmentsRef = ref(database, 'appointments')
+      const newAppointmentRef = push(appointmentsRef)
+      await set(newAppointmentRef, appointmentData)
 
       toast({
         title: "Success",
@@ -221,7 +221,16 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
                   <FormItem>
                     <FormLabel>Age</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="Enter age" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="Enter age"
+                        {...field}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          field.onChange(value === '' ? '' : Number(value));
+                        }}
+                        value={field.value === undefined || field.value === null ? '' : field.value}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

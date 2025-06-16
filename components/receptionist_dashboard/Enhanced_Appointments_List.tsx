@@ -1,19 +1,88 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Calendar, Search, Edit, Trash2 } from "lucide-react"
 import type { Appointment } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { database } from "@/lib/firebase"
+import { ref, onValue, remove, update } from "firebase/database"
+import { useToast } from "@/components/ui/use-toast"
 
 interface EnhancedAppointmentsListProps {
-  appointments: Appointment[]
-  isLoading: boolean
+  onAppointmentUpdated?: () => void
 }
 
-export default function EnhancedAppointmentsList({ appointments, isLoading }: EnhancedAppointmentsListProps) {
+export default function EnhancedAppointmentsList({ onAppointmentUpdated }: EnhancedAppointmentsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const appointmentsRef = ref(database, 'appointments')
+    
+    // Set up real-time listener
+    const unsubscribe = onValue(appointmentsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const appointmentsData = snapshot.val()
+        const appointmentsArray = Object.entries(appointmentsData).map(([id, data]: [string, any]) => ({
+          id,
+          ...data
+        }))
+        setAppointments(appointmentsArray)
+      } else {
+        setAppointments([])
+      }
+      setIsLoading(false)
+    })
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe()
+  }, [])
+
+  const handleDeleteAppointment = async (appointmentId: string) => {
+    try {
+      const appointmentRef = ref(database, `appointments/${appointmentId}`)
+      await remove(appointmentRef)
+      toast({
+        title: "Success",
+        description: "Appointment deleted successfully",
+      })
+      if (onAppointmentUpdated) {
+        onAppointmentUpdated()
+      }
+    } catch (error) {
+      console.error("Error deleting appointment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete appointment",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleStatusUpdate = async (appointmentId: string, newStatus: string) => {
+    try {
+      const appointmentRef = ref(database, `appointments/${appointmentId}`)
+      await update(appointmentRef, { status: newStatus })
+      toast({
+        title: "Success",
+        description: "Appointment status updated successfully",
+      })
+      if (onAppointmentUpdated) {
+        onAppointmentUpdated()
+      }
+    } catch (error) {
+      console.error("Error updating appointment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update appointment status",
+        variant: "destructive",
+      })
+    }
+  }
 
   const filteredAppointments = appointments.filter(
     (appointment) =>
@@ -107,10 +176,22 @@ export default function EnhancedAppointmentsList({ appointments, isLoading }: En
                   <div className="text-right">
                     <span className="text-sm font-medium text-gray-900">{appointment.time}</span>
                     <div className="flex items-center gap-1 mt-2">
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleStatusUpdate(appointment.id, 
+                          appointment.status === 'scheduled' ? 'in-progress' : 
+                          appointment.status === 'in-progress' ? 'completed' : 'scheduled'
+                        )}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteAppointment(appointment.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
