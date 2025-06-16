@@ -20,9 +20,26 @@ export default function PatientList({
   onSelectAppointment,
 }: EnhancedPatientListProps) {
   const [activeTab, setActiveTab] = useState("upcoming")
+  const [searchQuery, setSearchQuery] = useState("")
 
-  const upcomingAppointments = appointments.filter((app) => app.status === "scheduled")
-  const completedAppointments = appointments.filter((app) => app.status === "completed")
+  // Search filter function
+  const filterAppointments = (appointments: Appointment[]) => {
+    return appointments.filter((appointment) => {
+      const searchTerm = searchQuery.toLowerCase()
+      return (
+        appointment.patientName.toLowerCase().includes(searchTerm) ||
+        appointment.symptoms.some(symptom => 
+          symptom.toLowerCase().includes(searchTerm)
+        ) ||
+        appointment.time.toLowerCase().includes(searchTerm)
+      )
+    })
+  }
+
+  // First filter by search, then by status
+  const filteredAppointments = filterAppointments(appointments)
+  const upcomingAppointments = filteredAppointments.filter((app) => app.status === "scheduled")
+  const completedAppointments = filteredAppointments.filter((app) => app.status === "completed")
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -61,6 +78,8 @@ export default function PatientList({
           <input
             type="text"
             placeholder="Search patients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -106,7 +125,7 @@ export default function PatientList({
               ? upcomingAppointments
               : activeTab === "completed"
                 ? completedAppointments
-                : appointments
+                : filteredAppointments
             ).map((appointment) => (
               <div
                 key={appointment.id}
@@ -141,4 +160,4 @@ export default function PatientList({
       </CardContent>
     </Card>
   )
-} 
+}

@@ -35,6 +35,7 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [medicineSearchResults, setMedicineSearchResults] = useState<Medicine[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [open, setOpen] = useState(false);
   const { toast } = useToast()
 
   // New medicine form state
@@ -280,13 +281,13 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
               )}
             </Button>
 
-            <Dialog>
-              <DialogTrigger asChild>
+            <Dialog >
+              <DialogTrigger asChild >
                 <Button variant="outline" size="sm">
                   Templates
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="text-black">
                 <DialogHeader>
                   <DialogTitle>Prescription Templates</DialogTitle>
                   <DialogDescription>Select a template to quickly fill the prescription.</DialogDescription>
@@ -298,7 +299,9 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
                       variant="outline"
                       className="justify-start"
                       onClick={() => {
+
                         applyTemplate(template.name)
+                        setOpen(false);
                         document.querySelector('[data-state="open"]')?.setAttribute("data-state", "closed")
                       }}
                     >
@@ -357,13 +360,13 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
             <div className="text-center py-4 text-gray-500 border rounded-md">No medicines added yet</div>
           )}
 
-          <Dialog>
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="mt-4 bg-doctor hover:bg-green-700">
                 <Plus className="mr-2 h-4 w-4" /> Add Medicine
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="text-black">
               <DialogHeader>
                 <DialogTitle>Add Medicine</DialogTitle>
                 <DialogDescription>Add a new medicine to the prescription.</DialogDescription>

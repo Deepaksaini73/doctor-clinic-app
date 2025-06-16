@@ -7,6 +7,8 @@ import MainLayout from "@/components/layout/main-layout"
 import PrescriptionEditor from "@/components/doctor_dashboard/prescription-editor"
 import PatientList from "@/components/doctor_dashboard/Patient_List"
 import PatientProfile from "@/components/doctor_dashboard/Patient_Profile"
+import { database } from "@/lib/firebase"
+import { ref, onValue, remove, update } from "firebase/database"
 
 export default function DoctorDashboardPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
@@ -16,28 +18,35 @@ export default function DoctorDashboardPage() {
 
   // Fetch appointments
   useEffect(() => {
-    const fetchAppointments = async () => {
-      setIsLoading(true)
-      try {
-        const today = new Date().toISOString().split("T")[0]
-        const response = await fetch(`/api/appointments?date=${today}`)
-        if (!response.ok) throw new Error("Failed to fetch appointments")
-        const data = await response.json()
-        setAppointments(data)
+  const appointmentsRef = ref(database, 'appointments');
 
-        // Select the first appointment by default
-        if (data.length > 0 && !selectedAppointment) {
-          setSelectedAppointment(data[0])
-        }
-      } catch (error) {
-        console.error("Error fetching appointments:", error)
-      } finally {
-        setIsLoading(false)
-      }
+  const unsubscribe = onValue(appointmentsRef, (snapshot) => {
+    if (snapshot.exists()) {
+      const appointmentsData = snapshot.val();
+
+      // Convert object to array
+      const appointmentsArray = Object.entries(appointmentsData).map(
+        ([id, data]: [string, any]) => ({
+          id,
+          ...data,
+        })
+      );
+
+      // ✅ Filter for today’s appointments
+      const today = new Date().toISOString().split("T")[0];
+      const todaysAppointments = appointmentsArray.filter(
+        (appointment) => appointment.date === today
+      );
+
+      setAppointments(todaysAppointments);
+    } else {
+      setAppointments([]);
     }
+    setIsLoading(false);
+  });
 
-    fetchAppointments()
-  }, [])
+  return () => unsubscribe();
+}, []);
 
   // Fetch patient data when appointment is selected
   useEffect(() => {
