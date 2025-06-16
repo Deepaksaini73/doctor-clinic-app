@@ -102,10 +102,10 @@ export default function PatientProfile({ appointment, patient }: EnhancedPatient
                 <span className="font-medium">Age:</span> {appointment.patientAge} years
               </p>
               <p>
-                <span className="font-medium">Gender:</span> {patient?.gender}
+                <span className="font-medium">Gender:</span> {appointment?.gender}
               </p>
               <p>
-                <span className="font-medium">Contact:</span> {patient?.contact}
+                <span className="font-medium">Contact:</span> {appointment?.contact}
               </p>
               <p>
                 <span className="font-medium">Patient ID:</span> {appointment.patientId}
