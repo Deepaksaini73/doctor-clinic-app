@@ -1,13 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { database } from "@/lib/firebase"
 import { ref, onValue, push, set } from "firebase/database"
 import { useToast } from "@/components/ui/use-toast"
@@ -16,27 +26,56 @@ interface Doctor {
   id: string
   name: string
   specialization: string
+  availability: {
+    days: string[]
+    hours: string
+  }
+  imageUrl: string
 }
 
 interface Patient {
   id: string
   name: string
   age: number
+  gender: string
+  contact: string
+  medicalHistory: {
+    allergies: string[]
+    chronicConditions: string[]
+    pastVisits: Array<{
+      id: string
+      date: string
+      doctorId: string
+      doctorName: string
+      symptoms: string[]
+      diagnosis: string
+      prescription: {
+        id: string
+        medicines: Array<{
+          name: string
+          dosage: string
+          frequency: string
+          duration: string
+        }>
+        instructions: string
+      }
+    }>
+  }
 }
 
-interface NewAppointment {
-  patientName: string
-  doctorName: string
-  date: string
-  status: string
-  notes: string
-}
-
-interface EnhancedCreateAppointmentProps {
+interface CreateAppointmentProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  newAppointment: NewAppointment
-  onNewAppointmentChange: (appointment: NewAppointment) => void
+  newAppointment: {
+    patientId: string
+    doctorId: string
+    date: string
+    time: string
+    symptoms: string[]
+    status: string
+    priority: string
+  }
+  onNewAppointmentChange: (appointment: any) => void
   onCreateAppointment: () => void
 }
 
@@ -46,7 +85,7 @@ export default function CreateAppointment({
   newAppointment,
   onNewAppointmentChange,
   onCreateAppointment,
-}: EnhancedCreateAppointmentProps) {
+}: CreateAppointmentProps) {
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
   const { toast } = useToast()
@@ -60,7 +99,7 @@ export default function CreateAppointment({
         const doctorsArray = Object.entries(doctorsData).map(([id, data]: [string, any]) => ({
           id,
           ...data
-        }))
+        })) as Doctor[]
         setDoctors(doctorsArray)
       }
     })
@@ -73,7 +112,7 @@ export default function CreateAppointment({
         const patientsArray = Object.entries(patientsData).map(([id, data]: [string, any]) => ({
           id,
           ...data
-        }))
+        })) as Patient[]
         setPatients(patientsArray)
       }
     })
@@ -84,14 +123,50 @@ export default function CreateAppointment({
     }
   }, [])
 
-  const handleCreateAppointment = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     try {
       const appointmentsRef = ref(database, 'appointments')
       const newAppointmentRef = push(appointmentsRef)
       
+      // Get selected patient and doctor details
+      const selectedPatient = patients.find(p => p.id === newAppointment.patientId)
+      const selectedDoctor = doctors.find(d => d.id === newAppointment.doctorId)
+
+      if (!selectedPatient || !selectedDoctor) {
+        throw new Error("Patient or doctor not found")
+      }
+
+      // Create appointment with the structure matching mock-data.ts
       await set(newAppointmentRef, {
-        ...newAppointment,
-        createdAt: new Date().toISOString()
+        id: newAppointmentRef.key,
+        patientId: newAppointment.patientId,
+        patientName: selectedPatient.name,
+        patientAge: selectedPatient.age,
+        doctorId: newAppointment.doctorId,
+        doctorName: selectedDoctor.name,
+        date: newAppointment.date,
+        time: newAppointment.time,
+        symptoms: newAppointment.symptoms,
+        status: newAppointment.status,
+        priority: newAppointment.priority
+      })
+
+      // Update patient's medical history with new visit
+      const patientRef = ref(database, `patients/${newAppointment.patientId}/medicalHistory/pastVisits`)
+      const newVisitRef = push(patientRef)
+      await set(newVisitRef, {
+        id: newVisitRef.key,
+        date: newAppointment.date,
+        doctorId: newAppointment.doctorId,
+        doctorName: selectedDoctor.name,
+        symptoms: newAppointment.symptoms,
+        diagnosis: "", // To be filled by doctor during visit
+        prescription: {
+          id: `pr${Date.now()}`,
+          medicines: [],
+          instructions: ""
+        }
       })
 
       toast({
@@ -99,7 +174,7 @@ export default function CreateAppointment({
         description: "Appointment created successfully",
       })
 
-      onCreateAppointment()
+      onOpenChange(false)
     } catch (error) {
       console.error("Error creating appointment:", error)
       toast({
@@ -113,97 +188,109 @@ export default function CreateAppointment({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="w-4 h-4 mr-2" />
-          New Appointment
+        <Button className="bg-blue-600 text-white hover:bg-blue-700">
+          Create Appointment
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create New Appointment</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Patient Name</Label>
-              <Select
-                value={newAppointment.patientName}
-                onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, patientName: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select patient" />
-                </SelectTrigger>
-                <SelectContent>
-                  {patients.map((patient) => (
-                    <SelectItem key={patient.id} value={patient.name}>
-                      {patient.name} ({patient.age} years)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Doctor Name</Label>
-              <Select
-                value={newAppointment.doctorName}
-                onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, doctorName: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select doctor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {doctors.map((doctor) => (
-                    <SelectItem key={doctor.id} value={doctor.name}>
-                      {doctor.name} - {doctor.specialization}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="patient">Patient</Label>
+            <Select
+              value={newAppointment.patientId}
+              onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, patientId: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select patient" />
+              </SelectTrigger>
+              <SelectContent>
+                {patients.map((patient) => (
+                  <SelectItem key={patient.id} value={patient.id}>
+                    {patient.name} ({patient.age} years, {patient.gender})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="doctor">Doctor</Label>
+            <Select
+              value={newAppointment.doctorId}
+              onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, doctorId: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select doctor" />
+              </SelectTrigger>
+              <SelectContent>
+                {doctors.map((doctor) => (
+                  <SelectItem key={doctor.id} value={doctor.id}>
+                    {doctor.name} ({doctor.specialization})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Appointment Date</Label>
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
               <Input
+                id="date"
                 type="date"
                 value={newAppointment.date}
                 onChange={(e) => onNewAppointmentChange({ ...newAppointment, date: e.target.value })}
+                required
               />
             </div>
-            <div>
-              <Label>Status</Label>
-              <Select
-                value={newAppointment.status}
-                onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Scheduled">Scheduled</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                  <SelectItem value="Cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-2">
+              <Label htmlFor="time">Time</Label>
+              <Input
+                id="time"
+                type="time"
+                value={newAppointment.time}
+                onChange={(e) => onNewAppointmentChange({ ...newAppointment, time: e.target.value })}
+                required
+              />
             </div>
           </div>
-          <div>
-            <Label>Notes</Label>
-            <Textarea
-              placeholder="Enter appointment notes"
-              value={newAppointment.notes}
-              onChange={(e) => onNewAppointmentChange({ ...newAppointment, notes: e.target.value })}
+
+          <div className="space-y-2">
+            <Label htmlFor="symptoms">Symptoms</Label>
+            <Input
+              id="symptoms"
+              value={newAppointment.symptoms.join(", ")}
+              onChange={(e) => onNewAppointmentChange({ 
+                ...newAppointment, 
+                symptoms: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+              })}
+              placeholder="Enter symptoms separated by commas"
             />
           </div>
-          <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button onClick={handleCreateAppointment} className="flex-1 bg-blue-600 hover:bg-blue-700">
-              Create Appointment
-            </Button>
+
+          <div className="space-y-2">
+            <Label htmlFor="priority">Priority</Label>
+            <Select
+              value={newAppointment.priority}
+              onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, priority: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="routine">Routine</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
+
+          <Button type="submit" className="w-full bg-blue-600 text-white hover:bg-blue-700">
+            Create Appointment
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   )

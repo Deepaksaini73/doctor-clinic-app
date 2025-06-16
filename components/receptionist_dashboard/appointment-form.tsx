@@ -12,17 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Doctor } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+import { Loader2, Search } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { database } from "@/lib/firebase"
-import { ref, push, get, set } from "firebase/database"
+import { ref, push, get, set, query, orderByChild, equalTo } from "firebase/database"
 
 const formSchema = z.object({
+  patientId: z.string().optional(),
   patientName: z.string().min(2, { message: "Patient name is required" }),
   patientAge: z.coerce
     .number()
     .min(1, { message: "Age must be at least 1" })
     .max(120, { message: "Age must be less than 120" }),
+  gender: z.enum(["male", "female", "other"], { required_error: "Please select a gender" }),
+  mobileNumber: z.string().min(10, { message: "Mobile number must be at least 10 digits" }),
   symptoms: z.string().min(3, { message: "Symptoms are required" }),
   doctorId: z.string().min(1, { message: "Please select a doctor" }),
   priority: z.enum(["routine", "urgent", "emergency"], { required_error: "Please select a priority" }),
@@ -36,16 +39,35 @@ interface AppointmentFormProps {
   onAppointmentCreated: () => void
 }
 
+interface Patient {
+  patientId: string
+  name: string
+  age: number
+  gender: "male" | "female" | "other"
+  contact: string
+  email?: string
+  address?: string
+  medicalHistory?: {
+    allergies: string[]
+    chronicConditions: string[]
+    pastVisits: any[]
+  }
+}
+
 export default function AppointmentForm({ transcript, onAppointmentCreated }: AppointmentFormProps) {
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const { toast } = useToast()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      patientId: "",
       patientName: "",
       patientAge: 0,
+      gender: "male",
+      mobileNumber: "",
       symptoms: "",
       doctorId: "",
       priority: "routine",
@@ -79,6 +101,61 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
 
     fetchDoctors()
   }, [toast])
+
+  const handlePatientSearch = async () => {
+    const patientId = form.getValues("patientId")
+    if (!patientId) {
+      toast({
+        title: "Error",
+        description: "Please enter a patient ID",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const patientsRef = ref(database, 'patients')
+      const snapshot = await get(patientsRef)
+
+      if (snapshot.exists()) {
+        const patientsData = snapshot.val() as Record<string, Patient>
+        const patient = Object.values(patientsData).find(p => p.patientId === patientId)
+
+        if (patient) {
+          form.setValue("patientName", patient.name)
+          form.setValue("patientAge", patient.age)
+          form.setValue("gender", patient.gender)
+          form.setValue("mobileNumber", patient.contact)
+          toast({
+            title: "Success",
+            description: "Patient information loaded successfully",
+          })
+        } else {
+          toast({
+            title: "Not Found",
+            description: "No patient found with this ID",
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "Not Found",
+          description: "No patients found in the database",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error searching patient:", error)
+      toast({
+        title: "Error",
+        description: "Failed to search patient. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSearching(false)
+    }
+  }
 
   useEffect(() => {
     if (transcript) {
@@ -153,9 +230,41 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
       // Find doctor name from ID
       const doctor = doctors.find((d) => d.id === data.doctorId)
 
+      // Generate new patient ID if not provided
+      let patientId = data.patientId
+      if (!patientId) {
+        patientId = `PAT${Date.now()}`
+        
+        // Create new patient record
+        const patientsRef = ref(database, 'patients')
+        const newPatientRef = push(patientsRef)
+        await set(newPatientRef, {
+          patientId,
+          name: data.patientName,
+          age: data.patientAge,
+          gender: data.gender,
+          contact: data.mobileNumber,
+          email: "", // You might want to add email field to the form
+          address: "", // You might want to add address field to the form
+          medicalHistory: {
+            allergies: [],
+            chronicConditions: [],
+            pastVisits: []
+          }
+        })
+
+        toast({
+          title: "New Patient Created",
+          description: `Patient ID: ${patientId} has been generated`,
+        })
+      }
+
       const appointmentData = {
+        patientId,
         patientName: data.patientName,
         patientAge: data.patientAge,
+        gender: data.gender,
+        mobileNumber: data.mobileNumber,
         doctorId: data.doctorId,
         doctorName: doctor?.name || "",
         date: new Date().toISOString().split("T")[0], // Today's date
@@ -199,43 +308,120 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <FormField
                 control={form.control}
-                name="patientName"
+                name="patientId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Patient Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter patient name" {...field} />
-                    </FormControl>
+                    <FormLabel>Patient ID (Optional)</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input placeholder="Enter patient ID" {...field} />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handlePatientSearch}
+                        disabled={isSearching}
+                        className="whitespace-nowrap"
+                      >
+                        {isSearching ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Search className="h-4 w-4" />
+                        )}
+                        <span className="ml-2">Search</span>
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="patientAge"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Age</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Enter age"
-                        {...field}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          field.onChange(value === '' ? '' : Number(value));
-                        }}
-                        value={field.value === undefined || field.value === null ? '' : field.value}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="patientName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Patient Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter patient name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="patientAge"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Enter age"
+                          {...field}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            field.onChange(value === '' ? '' : Number(value));
+                          }}
+                          value={field.value === undefined || field.value === null ? '' : field.value}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gender</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="mobileNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mobile Number</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="tel" 
+                          placeholder="Enter mobile number" 
+                          {...field}
+                          pattern="[0-9]{10}"
+                          title="Please enter a valid 10-digit mobile number"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <FormField
