@@ -4,9 +4,9 @@ import { useState, useEffect } from "react"
 import type { Appointment, Patient } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import MainLayout from "@/components/layout/main-layout"
-import PrescriptionEditor from "@/components/doctor/prescription-editor"
-import EnhancedPatientList from "@/components/doctor_dashboard/Enhanced_Patient_List"
-import EnhancedPatientProfile from "@/components/doctor_dashboard/Enhanced_Patient_Profile"
+import PrescriptionEditor from "@/components/doctor_dashboard/prescription-editor"
+import PatientList from "@/components/doctor_dashboard/Patient_List"
+import PatientProfile from "@/components/doctor_dashboard/Patient_Profile"
 
 export default function DoctorDashboardPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
@@ -65,7 +65,7 @@ export default function DoctorDashboardPage() {
     <MainLayout title="Welcome back, Dr. Smith!" subtitle="Patient management and AI-assisted prescriptions">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Patients */}
-        <EnhancedPatientList
+        <PatientList
           appointments={appointments}
           selectedAppointment={selectedAppointment}
           isLoading={isLoading}
@@ -77,7 +77,7 @@ export default function DoctorDashboardPage() {
           {selectedAppointment ? (
             <>
               {/* Patient Profile */}
-              <EnhancedPatientProfile appointment={selectedAppointment} patient={patient} />
+              <PatientProfile appointment={selectedAppointment} patient={patient} />
 
               {/* AI-Assisted Prescription */}
               <PrescriptionEditor appointment={selectedAppointment} symptoms={selectedAppointment.symptoms} />

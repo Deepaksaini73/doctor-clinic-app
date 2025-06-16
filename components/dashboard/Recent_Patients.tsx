@@ -19,7 +19,7 @@ interface EnhancedRecentPatientsProps {
   patients: Patient[]
 }
 
-export default function EnhancedRecentPatients({ patients }: EnhancedRecentPatientsProps) {
+export default function RecentPatients({ patients }: EnhancedRecentPatientsProps) {
   return (
     <Card>
       <CardHeader>

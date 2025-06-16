@@ -10,7 +10,7 @@ interface EnhancedUsersStatsProps {
   receptionistUsers: number
 }
 
-export default function EnhancedUsersStats({
+export default function UsersStats({
   totalUsers,
   adminUsers,
   doctorUsers,

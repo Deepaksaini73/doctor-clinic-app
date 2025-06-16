@@ -10,7 +10,7 @@ interface EnhancedPatientStatisticsProps {
   growthRate: number
 }
 
-export default function EnhancedPatientStatistics({ totalPatients, growthRate }: EnhancedPatientStatisticsProps) {
+export default function PatientStatistics({ totalPatients, growthRate }: EnhancedPatientStatisticsProps) {
   return (
     <Card className="lg:col-span-2">
       <CardHeader>
