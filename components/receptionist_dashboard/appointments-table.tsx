@@ -7,7 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import type { Appointment } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
-import { Search } from "lucide-react"
+import { Search, MoreVertical } from "lucide-react"
+import { database } from "@/lib/firebase"
+import { ref, onValue, update, remove } from "firebase/database"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 
 export default function AppointmentsTable() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -15,37 +24,69 @@ export default function AppointmentsTable() {
   const [searchQuery, setSearchQuery] = useState("")
   const { toast } = useToast()
 
-  const fetchAppointments = async () => {
-    setIsLoading(true)
+  useEffect(() => {
+    const appointmentsRef = ref(database, 'appointments')
+    
+    // Set up real-time listener
+    const unsubscribe = onValue(appointmentsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const appointmentsData = snapshot.val()
+        const appointmentsArray = Object.entries(appointmentsData).map(([id, data]: [string, any]) => ({
+          id,
+          ...data
+        }))
+        // Sort appointments by time
+        appointmentsArray.sort((a, b) => {
+          const timeA = a.time.toLowerCase()
+          const timeB = b.time.toLowerCase()
+          return timeA.localeCompare(timeB)
+        })
+        setAppointments(appointmentsArray)
+      } else {
+        setAppointments([])
+      }
+      setIsLoading(false)
+    })
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe()
+  }, [])
+
+  const handleStatusUpdate = async (appointmentId: string, newStatus: string) => {
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0]
-
-      const response = await fetch(`/api/appointments?date=${today}`)
-      if (!response.ok) throw new Error("Failed to fetch appointments")
-
-      const data = await response.json()
-      setAppointments(data)
+      const appointmentRef = ref(database, `appointments/${appointmentId}`)
+      await update(appointmentRef, { status: newStatus })
+      toast({
+        title: "Success",
+        description: "Appointment status updated successfully",
+      })
     } catch (error) {
-      console.error("Error fetching appointments:", error)
+      console.error("Error updating appointment:", error)
       toast({
         title: "Error",
-        description: "Failed to load appointments. Please try again.",
+        description: "Failed to update appointment status",
         variant: "destructive",
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchAppointments()
-
-    // Set up polling to refresh appointments every 30 seconds
-    const intervalId = setInterval(fetchAppointments, 30000)
-
-    return () => clearInterval(intervalId)
-  }, [toast])
+  const handleDeleteAppointment = async (appointmentId: string) => {
+    try {
+      const appointmentRef = ref(database, `appointments/${appointmentId}`)
+      await remove(appointmentRef)
+      toast({
+        title: "Success",
+        description: "Appointment deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting appointment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete appointment",
+        variant: "destructive",
+      })
+    }
+  }
 
   const filteredAppointments = appointments.filter(
     (appointment) =>
@@ -130,6 +171,7 @@ export default function AppointmentsTable() {
                   <TableHead>Symptoms</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-[50px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -144,6 +186,44 @@ export default function AppointmentsTable() {
                     </TableCell>
                     <TableCell>{getPriorityBadge(appointment.priority)}</TableCell>
                     <TableCell>{getStatusBadge(appointment.status)}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {appointment.status !== 'completed' && (
+                            <DropdownMenuItem
+                              onClick={() => handleStatusUpdate(appointment.id, 'completed')}
+                            >
+                              Mark as Completed
+                            </DropdownMenuItem>
+                          )}
+                          {appointment.status !== 'in-progress' && (
+                            <DropdownMenuItem
+                              onClick={() => handleStatusUpdate(appointment.id, 'in-progress')}
+                            >
+                              Mark as In Progress
+                            </DropdownMenuItem>
+                          )}
+                          {appointment.status !== 'cancelled' && (
+                            <DropdownMenuItem
+                              onClick={() => handleStatusUpdate(appointment.id, 'cancelled')}
+                            >
+                              Cancel Appointment
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => handleDeleteAppointment(appointment.id)}
+                          >
+                            Delete Appointment
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
