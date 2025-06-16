@@ -5,28 +5,34 @@ import MainLayout from "@/components/layout/main-layout"
 import AppointmentsList from "@/components/appointments_dashboard/Appointments_List"
 import CreateAppointment from "@/components/appointments_dashboard/Create_Appointment"
 import { database } from "@/lib/firebase"
-import { ref, onValue, push, set } from "firebase/database"
+import { ref, onValue } from "firebase/database"
 import { useToast } from "@/components/ui/use-toast"
 
 interface Appointment {
   id: string
+  patientId: string
   patientName: string
+  patientAge: number
+  doctorId: string
   doctorName: string
   date: string
+  time: string
+  symptoms: string[]
   status: string
-  notes: string
-  createdAt?: string
+  priority: string
 }
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [newAppointment, setNewAppointment] = useState({
-    patientName: "",
-    doctorName: "",
+    patientId: "",
+    doctorId: "",
     date: "",
-    status: "Scheduled",
-    notes: "",
+    time: "",
+    symptoms: [] as string[],
+    status: "scheduled",
+    priority: "routine"
   })
   const [searchQuery, setSearchQuery] = useState("")
   const { toast } = useToast()
@@ -41,8 +47,12 @@ export default function AppointmentsPage() {
           id,
           ...data
         })) as Appointment[]
-        // Sort appointments by date
-        appointmentsArray.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        // Sort appointments by date and time
+        appointmentsArray.sort((a, b) => {
+          const dateA = new Date(`${a.date}T${a.time}`).getTime()
+          const dateB = new Date(`${b.date}T${b.time}`).getTime()
+          return dateA - dateB
+        })
         setAppointments(appointmentsArray)
       } else {
         setAppointments([])
@@ -55,41 +65,11 @@ export default function AppointmentsPage() {
   const filteredAppointments = appointments.filter(
     (appointment) =>
       appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      appointment.doctorName.toLowerCase().includes(searchQuery.toLowerCase()),
+      appointment.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      appointment.symptoms.some(symptom => 
+        symptom.toLowerCase().includes(searchQuery.toLowerCase())
+      )
   )
-
-  const handleCreateAppointment = async () => {
-    try {
-      const appointmentsRef = ref(database, 'appointments')
-      const newAppointmentRef = push(appointmentsRef)
-      
-      await set(newAppointmentRef, {
-        ...newAppointment,
-        createdAt: new Date().toISOString()
-      })
-
-      toast({
-        title: "Success",
-        description: "Appointment created successfully",
-      })
-
-      setNewAppointment({
-        patientName: "",
-        doctorName: "",
-        date: "",
-        status: "Scheduled",
-        notes: "",
-      })
-      setIsCreateModalOpen(false)
-    } catch (error) {
-      console.error("Error creating appointment:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create appointment",
-        variant: "destructive",
-      })
-    }
-  }
 
   return (
     <MainLayout title="Appointments" subtitle="Manage and track all appointments">
@@ -105,7 +85,7 @@ export default function AppointmentsPage() {
             onOpenChange={setIsCreateModalOpen}
             newAppointment={newAppointment}
             onNewAppointmentChange={setNewAppointment}
-            onCreateAppointment={handleCreateAppointment}
+            onCreateAppointment={() => {}}
           />
         </div>
 
