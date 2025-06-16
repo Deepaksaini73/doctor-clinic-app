@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { database } from "@/lib/firebase"
-import { ref, onValue, push, set, query, orderByChild, equalTo, get } from "firebase/database"
+import { ref, onValue, push, set, get } from "firebase/database"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
@@ -34,10 +34,10 @@ import {
 
 interface Patient {
   id: string
-  patientId: string // Unique identifier for the patient
+  patientId: string
   name: string
   age: number
-  gender: string
+  gender: "male" | "female" | "other"
   contact: string
   email: string
   address: string
@@ -65,15 +65,26 @@ interface Patient {
   }
 }
 
+interface NewPatient {
+  name: string
+  age: string
+  gender: "male" | "female" | "other"
+  contact: string
+  email: string
+  address: string
+  allergies: string
+  chronicConditions: string
+}
+
 export default function PatientPage() {
   const [patients, setPatients] = useState<Patient[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [searchType, setSearchType] = useState<"id" | "name">("name")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [newPatient, setNewPatient] = useState({
+  const [newPatient, setNewPatient] = useState<NewPatient>({
     name: "",
     age: "",
-    gender: "",
+    gender: "male",
     contact: "",
     email: "",
     address: "",
@@ -121,23 +132,30 @@ export default function PatientPage() {
       if (searchType === "id") {
         // Search by patient ID
         const patientsRef = ref(database, 'patients')
-        const patientQuery = query(patientsRef, orderByChild('patientId'), equalTo(searchQuery))
-        const snapshot = await get(patientQuery)
+        const snapshot = await get(patientsRef)
         
         if (snapshot.exists()) {
           const patientsData = snapshot.val()
-          const patientsArray = Object.entries(patientsData).map(([id, data]: [string, any]) => ({
-            id,
-            ...data
-          })) as Patient[]
-          setPatients(patientsArray)
-        } else {
-          setPatients([])
-          toast({
-            title: "Not Found",
-            description: "No patient found with this ID",
-            variant: "destructive",
-          })
+          const patientsArray = Object.entries(patientsData)
+            .map(([id, data]: [string, any]) => ({
+              id,
+              ...data
+            })) as Patient[]
+          
+          const filteredPatients = patientsArray.filter(
+            patient => patient.patientId === searchQuery
+          )
+          
+          if (filteredPatients.length > 0) {
+            setPatients(filteredPatients)
+          } else {
+            setPatients([])
+            toast({
+              title: "Not Found",
+              description: "No patient found with this ID",
+              variant: "destructive",
+            })
+          }
         }
       } else {
         // Search by name
@@ -188,7 +206,7 @@ export default function PatientPage() {
       setNewPatient({
         name: "",
         age: "",
-        gender: "",
+        gender: "male",
         contact: "",
         email: "",
         address: "",
@@ -250,7 +268,8 @@ export default function PatientPage() {
                     <Label htmlFor="gender">Gender</Label>
                     <Select
                       value={newPatient.gender}
-                      onValueChange={(value) => setNewPatient({ ...newPatient, gender: value })}
+                      onValueChange={(value: "male" | "female" | "other") => 
+                        setNewPatient({ ...newPatient, gender: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select gender" />
@@ -367,7 +386,7 @@ export default function PatientPage() {
                   <TableCell className="font-medium">{patient.patientId}</TableCell>
                   <TableCell>{patient.name}</TableCell>
                   <TableCell>{patient.age}</TableCell>
-                  <TableCell>{patient.gender}</TableCell>
+                  <TableCell className="capitalize">{patient.gender}</TableCell>
                   <TableCell>{patient.contact}</TableCell>
                   <TableCell>{patient.email}</TableCell>
                   <TableCell>{patient.medicalHistory.pastVisits.length}</TableCell>
