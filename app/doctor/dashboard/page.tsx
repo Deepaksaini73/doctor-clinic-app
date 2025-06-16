@@ -8,63 +8,96 @@ import PrescriptionEditor from "@/components/doctor_dashboard/prescription-edito
 import PatientList from "@/components/doctor_dashboard/Patient_List"
 import PatientProfile from "@/components/doctor_dashboard/Patient_Profile"
 import { database } from "@/lib/firebase"
-import { ref, onValue, remove, update } from "firebase/database"
+import { ref, onValue, get } from "firebase/database"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function DoctorDashboardPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [patient, setPatient] = useState<Patient | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { toast } = useToast()
 
   // Fetch appointments
   useEffect(() => {
-  const appointmentsRef = ref(database, 'appointments');
+    const appointmentsRef = ref(database, 'appointments')
 
-  const unsubscribe = onValue(appointmentsRef, (snapshot) => {
-    if (snapshot.exists()) {
-      const appointmentsData = snapshot.val();
+    const unsubscribe = onValue(appointmentsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const appointmentsData = snapshot.val()
 
-      // Convert object to array
-      const appointmentsArray = Object.entries(appointmentsData).map(
-        ([id, data]: [string, any]) => ({
-          id,
-          ...data,
-        })
-      );
+        // Convert object to array
+        const appointmentsArray = Object.entries(appointmentsData).map(
+          ([id, data]: [string, any]) => ({
+            id,
+            ...data,
+          })
+        )
 
-      // ✅ Filter for today’s appointments
-      const today = new Date().toISOString().split("T")[0];
-      const todaysAppointments = appointmentsArray.filter(
-        (appointment) => appointment.date === today
-      );
+        // Filter for today's appointments
+        const today = new Date().toISOString().split("T")[0]
+        const todaysAppointments = appointmentsArray.filter(
+          (appointment) => appointment.date === today
+        )
 
-      setAppointments(todaysAppointments);
-    } else {
-      setAppointments([]);
-    }
-    setIsLoading(false);
-  });
+        setAppointments(todaysAppointments)
+      } else {
+        setAppointments([])
+      }
+      setIsLoading(false)
+    })
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe()
+  }, [])
 
   // Fetch patient data when appointment is selected
   useEffect(() => {
     if (selectedAppointment) {
       const fetchPatient = async () => {
         try {
-          const response = await fetch(`/api/patients/${selectedAppointment.patientId}`)
-          if (!response.ok) throw new Error("Failed to fetch patient data")
-          const data = await response.json()
-          setPatient(data)
+          const patientsRef = ref(database, 'patients')
+          const snapshot = await get(patientsRef)
+          
+          if (snapshot.exists()) {
+            const patients = snapshot.val()
+            const patientData = Object.values(patients).find(
+              (p: any) => p.patientId === selectedAppointment.patientId
+            )
+            
+            if (patientData) {
+              setPatient(patientData as Patient)
+            } else {
+              toast({
+                title: "Patient Not Found",
+                description: "Could not find patient information.",
+                variant: "destructive",
+              })
+              setPatient(null)
+            }
+          } else {
+            toast({
+              title: "No Patients Found",
+              description: "No patient records found in the database.",
+              variant: "destructive",
+            })
+            setPatient(null)
+          }
         } catch (error) {
           console.error("Error fetching patient:", error)
+          toast({
+            title: "Error",
+            description: "Failed to fetch patient data. Please try again.",
+            variant: "destructive",
+          })
+          setPatient(null)
         }
       }
 
       fetchPatient()
+    } else {
+      setPatient(null)
     }
-  }, [selectedAppointment])
+  }, [selectedAppointment, toast])
 
   const handleSelectAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment)

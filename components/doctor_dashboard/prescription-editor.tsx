@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { Medicine, Appointment } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Plus, Trash2, Save, Download, Sparkles } from "lucide-react"
+import { Loader2, Plus, Trash2, Save, Download, Sparkles, Check } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ref, push, set, get } from "firebase/database"
+import { database } from "@/lib/firebase"
 
 interface PrescriptionEditorProps {
   appointment: Appointment | null
@@ -36,6 +38,7 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
   const [medicineSearchResults, setMedicineSearchResults] = useState<Medicine[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [open, setOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false)
   const { toast } = useToast()
 
   // New medicine form state
@@ -136,14 +139,53 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
     setIsLoading(true)
 
     try {
-      // In a real app, you would save the prescription to the database
-      // For this demo, we'll just show a success message
+      // Check if prescription already exists for this appointment
+      const prescriptionsRef = ref(database, 'prescriptions')
+      const snapshot = await get(prescriptionsRef)
+      
+      let prescriptionId = null
+      if (snapshot.exists()) {
+        const prescriptions = snapshot.val()
+        const existingPrescription = Object.entries(prescriptions).find(
+          ([_, prescription]: [string, any]) => prescription.appointmentId === appointment.id
+        )
+        if (existingPrescription) {
+          prescriptionId = existingPrescription[0] // Get the existing prescription ID
+        }
+      }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+      const prescriptionData = {
+        id: prescriptionId || push(prescriptionsRef).key,
+        appointmentId: appointment.id,
+        patientId: appointment.patientId,
+        date: new Date().toISOString(),
+        doctorId: appointment.doctorId,
+        doctorName: appointment.doctorName,
+        medicines: medicines.map(medicine => ({
+          name: medicine.name,
+          dosage: medicine.dosage,
+          frequency: medicine.frequency,
+          duration: medicine.duration,
+          notes: medicine.notes || ''
+        })),
+        instructions,
+        followUp
+      }
+
+      // If prescription exists, update it; otherwise create new
+      const prescriptionRef = ref(database, `prescriptions/${prescriptionId || prescriptionData.id}`)
+      await set(prescriptionRef, prescriptionData)
+
+      // Update appointment status to completed
+      const appointmentRef = ref(database, `appointments/${appointment.id}`)
+      await set(appointmentRef, {
+        ...appointment,
+        status: 'completed'
+      })
 
       toast({
         title: "Prescription Saved",
-        description: "Prescription has been saved successfully.",
+        description: prescriptionId ? "Prescription has been updated successfully." : "Prescription has been saved successfully.",
       })
     } catch (error) {
       console.error("Error saving prescription:", error)
@@ -480,7 +522,11 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
         <Button variant="outline">
           <Download className="mr-2 h-4 w-4" /> Export PDF
         </Button>
-        <Button onClick={handleSavePrescription} disabled={isLoading} className="bg-doctor hover:bg-green-700">
+        <Button 
+          onClick={handleSavePrescription} 
+          disabled={isLoading || !medicines.length} 
+          className="bg-doctor hover:bg-green-700"
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
