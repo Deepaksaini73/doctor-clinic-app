@@ -9,17 +9,17 @@ export default function ReceptionistPage() {
     <MainLayout title="Welcome back, Sabrina!" subtitle="Here is the latest update for the last 7 days, check now.">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Voice Booking System */}
-<<<<<<< Updated upstream
+
         <EnhancedVoiceBooking onAppointmentCreated={handleAppointmentCreated} />
 
         {/* Today's Appointments */}
         <EnhancedAppointmentsList appointments={appointments} isLoading={isLoading} />
-=======
+
         <VoiceBooking onAppointmentCreated={() => {}} />
 
         {/* Today's Appointments */}
         <AppointmentsList />
->>>>>>> Stashed changes
+
       </div>
     </MainLayout>
   )
