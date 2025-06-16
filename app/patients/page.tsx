@@ -2,212 +2,119 @@
 
 import { useState, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
+import AppointmentHistory from "@/components/patient_dashboard/Appointment_History"
+import MedicalHistory from "@/components/patient_dashboard/Medical_History"
 import { database } from "@/lib/firebase"
-import { ref, onValue, push, set, query, orderByChild, equalTo, get } from "firebase/database"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import { ref, onValue } from "firebase/database"
 import { useToast } from "@/components/ui/use-toast"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
-interface Patient {
+interface Appointment {
   id: string
-  patientId: string // Unique identifier for the patient
-  name: string
-  age: number
+  patientId: string
+  patientName: string
+  patientAge: number
   gender: string
-  contact: string
-  email: string
-  address: string
-  medicalHistory: {
-    allergies: string[]
-    chronicConditions: string[]
-    pastVisits: Array<{
-      id: string
-      date: string
-      doctorId: string
-      doctorName: string
-      symptoms: string[]
-      diagnosis: string
-      prescription: {
-        id: string
-        medicines: Array<{
-          name: string
-          dosage: string
-          frequency: string
-          duration: string
-        }>
-        instructions: string
-      }
-    }>
-  }
+  mobileNumber: string
+  doctorId: string
+  doctorName: string
+  date: string
+  time: string
+  symptoms: string[]
+  status: "scheduled" | "in-progress" | "completed" | "cancelled"
+  priority: "routine" | "urgent" | "emergency"
+  notes?: string
+  createdAt: string
+}
+
+interface MedicalRecord {
+  id: string
+  patientId: string
+  date: string
+  doctorId: string
+  doctorName: string
+  diagnosis: string
+  treatment: string
+  notes: string
+}
+
+interface Prescription {
+  id: string
+  date: string
+  doctorName: string
+  medications: {
+    name: string
+    dosage: string
+    frequency: string
+    duration: string
+  }[]
 }
 
 export default function PatientPage() {
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchType, setSearchType] = useState<"id" | "name">("name")
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [newPatient, setNewPatient] = useState({
-    name: "",
-    age: "",
-    gender: "",
-    contact: "",
-    email: "",
-    address: "",
-    allergies: "",
-    chronicConditions: ""
-  })
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([])
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
-    const patientsRef = ref(database, 'patients')
-    
-    const unsubscribe = onValue(patientsRef, (snapshot) => {
+    // Fetch appointments
+    const appointmentsRef = ref(database, 'appointments')
+    const appointmentsUnsubscribe = onValue(appointmentsRef, (snapshot) => {
       if (snapshot.exists()) {
-        const patientsData = snapshot.val()
-        const patientsArray = Object.entries(patientsData).map(([id, data]: [string, any]) => ({
+        const appointmentsData = snapshot.val()
+        const appointmentsArray = Object.entries(appointmentsData).map(([id, data]: [string, any]) => ({
           id,
           ...data
-        })) as Patient[]
-        setPatients(patientsArray)
+        })) as Appointment[]
+        setAppointments(appointmentsArray)
       } else {
-        setPatients([])
+        setAppointments([])
       }
     })
 
-    return () => unsubscribe()
-  }, [])
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      // If search is empty, fetch all patients
-      const patientsRef = ref(database, 'patients')
-      const snapshot = await get(patientsRef)
+    // Fetch medical records
+    const medicalRecordsRef = ref(database, 'medicalRecords')
+    const medicalRecordsUnsubscribe = onValue(medicalRecordsRef, (snapshot) => {
       if (snapshot.exists()) {
-        const patientsData = snapshot.val()
-        const patientsArray = Object.entries(patientsData).map(([id, data]: [string, any]) => ({
+        const recordsData = snapshot.val()
+        const recordsArray = Object.entries(recordsData).map(([id, data]: [string, any]) => ({
           id,
           ...data
-        })) as Patient[]
-        setPatients(patientsArray)
-      }
-      return
-    }
-
-    try {
-      if (searchType === "id") {
-        // Search by patient ID
-        const patientsRef = ref(database, 'patients')
-        const patientQuery = query(patientsRef, orderByChild('patientId'), equalTo(searchQuery))
-        const snapshot = await get(patientQuery)
-        
-        if (snapshot.exists()) {
-          const patientsData = snapshot.val()
-          const patientsArray = Object.entries(patientsData).map(([id, data]: [string, any]) => ({
-            id,
-            ...data
-          })) as Patient[]
-          setPatients(patientsArray)
-        } else {
-          setPatients([])
-          toast({
-            title: "Not Found",
-            description: "No patient found with this ID",
-            variant: "destructive",
-          })
-        }
+        })) as MedicalRecord[]
+        setMedicalRecords(recordsArray)
       } else {
-        // Search by name
-        const filteredPatients = patients.filter(
-          (patient) => patient.name.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        setPatients(filteredPatients)
+        setMedicalRecords([])
       }
-    } catch (error) {
-      console.error("Error searching patients:", error)
-      toast({
-        title: "Error",
-        description: "Failed to search patients",
-        variant: "destructive",
-      })
+    })
+
+    // Fetch prescriptions
+    const prescriptionsRef = ref(database, 'prescriptions')
+    const prescriptionsUnsubscribe = onValue(prescriptionsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const prescriptionsData = snapshot.val()
+        const prescriptionsArray = Object.entries(prescriptionsData).map(([id, data]: [string, any]) => ({
+          id,
+          ...data,
+          medications: data.medicines || [] // Map medicines to medications to match the interface
+        })) as Prescription[]
+        setPrescriptions(prescriptionsArray)
+      } else {
+        setPrescriptions([])
+      }
+    })
+
+    setIsLoading(false)
+
+    // Cleanup subscriptions
+    return () => {
+      appointmentsUnsubscribe()
+      medicalRecordsUnsubscribe()
+      prescriptionsUnsubscribe()
     }
-  }
-
-  const handleCreatePatient = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const patientsRef = ref(database, 'patients')
-      const newPatientRef = push(patientsRef)
-      
-      // Generate a unique patient ID (PAT + timestamp)
-      const patientId = `PAT${Date.now()}`
-      
-      await set(newPatientRef, {
-        patientId,
-        name: newPatient.name,
-        age: parseInt(newPatient.age),
-        gender: newPatient.gender,
-        contact: newPatient.contact,
-        email: newPatient.email,
-        address: newPatient.address,
-        medicalHistory: {
-          allergies: newPatient.allergies.split(',').map(item => item.trim()).filter(Boolean),
-          chronicConditions: newPatient.chronicConditions.split(',').map(item => item.trim()).filter(Boolean),
-          pastVisits: []
-        }
-      })
-
-      toast({
-        title: "Success",
-        description: `Patient created successfully with ID: ${patientId}`,
-      })
-
-      setNewPatient({
-        name: "",
-        age: "",
-        gender: "",
-        contact: "",
-        email: "",
-        address: "",
-        allergies: "",
-        chronicConditions: ""
-      })
-      setIsCreateModalOpen(false)
-    } catch (error) {
-      console.error("Error creating patient:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create patient",
-        variant: "destructive",
-      })
-    }
-  }
+  }, [])
 
   return (
-    <MainLayout title="Patients" subtitle="Manage patient records and medical history">
+    <MainLayout title="Patient Dashboard" subtitle="View your appointments, medical history, and prescriptions">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

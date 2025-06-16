@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import type { SystemLog } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
 import { Search, Download, RefreshCw } from "lucide-react"
+import { database } from "@/lib/firebase"
+import { ref, onValue } from "firebase/database"
 
 export default function SystemLogs() {
   const [logs, setLogs] = useState<SystemLog[]>([])
@@ -17,29 +19,32 @@ export default function SystemLogs() {
   const [searchQuery, setSearchQuery] = useState("")
   const { toast } = useToast()
 
-  const fetchLogs = async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch("/api/logs")
-      if (!response.ok) throw new Error("Failed to fetch logs")
-
-      const data = await response.json()
-      setLogs(data)
-      setFilteredLogs(data)
-    } catch (error) {
+  useEffect(() => {
+    const logsRef = ref(database, 'logs')
+    onValue(logsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const logsData = Object.entries(snapshot.val()).map(([id, data]) => ({
+          id,
+          ...(data as Omit<SystemLog, 'id'>)
+        }))
+        // Sort logs by timestamp in descending order
+        logsData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        setLogs(logsData)
+        setFilteredLogs(logsData)
+      } else {
+        setLogs([])
+        setFilteredLogs([])
+      }
+      setIsLoading(false)
+    }, (error) => {
       console.error("Error fetching logs:", error)
       toast({
         title: "Error",
         description: "Failed to load system logs. Please try again.",
         variant: "destructive",
       })
-    } finally {
       setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchLogs()
+    })
   }, [toast])
 
   useEffect(() => {
@@ -90,9 +95,6 @@ export default function SystemLogs() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="icon" onClick={fetchLogs}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
             <Button variant="outline" size="icon">
               <Download className="h-4 w-4" />
             </Button>

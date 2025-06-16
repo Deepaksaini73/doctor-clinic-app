@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import MainLayout from "@/components/layout/main-layout"
-import { ref, onValue, push, remove, DataSnapshot } from "firebase/database"
+import { ref, onValue, push, remove, DataSnapshot, get } from "firebase/database"
 import { database } from "@/lib/firebase"
 
 interface Doctor {
@@ -142,22 +142,34 @@ export default function DoctorsPage() {
     })
   }
 
-  const handleDeleteDoctor = (id: string) => {
-    const doctorRef = ref(database, `doctors/${id}`);
-    if (!doctorRef) {
+  const handleDeleteDoctor = async (id: string) => {
+    try {
+      const doctorRef = ref(database, `doctors/${id}`);
+      const snapshot = await get(doctorRef); // Get a snapshot to check if the doctor exists
+
+      if (!snapshot.exists()) {
+        toast({
+          title: "Error",
+          description: "Doctor not found in the database.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await remove(doctorRef); // Await the remove operation
+      toast({
+        title: "Success",
+        description: "Doctor removed successfully from the database.",
+      });
+    } catch (error) {
+      console.error("Error deleting doctor:", error);
       toast({
         title: "Error",
-        description: "Doctor not found",
+        description: "Failed to delete doctor. Please check your Firebase rules and try again.",
         variant: "destructive",
       });
-      return;
     }
-    remove(doctorRef);
-    toast({
-      title: "Success",
-      description: "Doctor removed successfully",
-    });
-  }
+  };
 
   const handleToggleStatus = (id: string) => {
     setDoctors(

@@ -5,6 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import type { Doctor } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
+import { database } from "@/lib/firebase"
+import { ref, onValue, remove } from "firebase/database"
+import { Trash2 } from "lucide-react"
+import { AnimatedButton } from "@/components/ui/animated-button"
 
 export default function DoctorAvailability() {
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -12,28 +16,46 @@ export default function DoctorAvailability() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const fetchDoctors = async () => {
-      setIsLoading(true)
-      try {
-        const response = await fetch("/api/doctors")
-        if (!response.ok) throw new Error("Failed to fetch doctors")
-
-        const data = await response.json()
-        setDoctors(data)
-      } catch (error) {
-        console.error("Error fetching doctors:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load doctor availability. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+    const doctorsRef = ref(database, 'doctors')
+    onValue(doctorsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const doctorsData = Object.entries(snapshot.val()).map(([id, data]) => ({
+          id,
+          ...(data as Omit<Doctor, 'id'>)
+        }))
+        setDoctors(doctorsData)
+      } else {
+        setDoctors([])
       }
-    }
-
-    fetchDoctors()
+      setIsLoading(false)
+    }, (error) => {
+      console.error("Error fetching doctors:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load doctor availability. Please try again.",
+        variant: "destructive",
+      })
+      setIsLoading(false)
+    })
   }, [toast])
+
+  const handleDeleteDoctor = async (doctorId: string) => {
+    try {
+      const doctorRef = ref(database, `doctors/${doctorId}`)
+      await remove(doctorRef)
+      toast({
+        title: "Success",
+        description: "Doctor deleted successfully.",
+      })
+    } catch (error) {
+      console.error("Error deleting doctor:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete doctor. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
@@ -59,6 +81,7 @@ export default function DoctorAvailability() {
                       {day}
                     </th>
                   ))}
+                  <th className="text-center p-2 border-b">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -77,10 +100,10 @@ export default function DoctorAvailability() {
                     </td>
                     {daysOfWeek.map((day) => (
                       <td key={day} className="text-center p-2 border-b">
-                        {doctor.availability.days.includes(day) ? (
+                        {doctor.availability?.days?.includes(day) ? (
                           <div>
                             <Badge className="bg-green-100 text-green-800 border-green-200">Available</Badge>
-                            <div className="text-xs mt-1">{doctor.availability.hours}</div>
+                            <div className="text-xs mt-1">{doctor.availability?.hours}</div>
                           </div>
                         ) : (
                           <Badge variant="outline" className="bg-gray-100 text-gray-500">
@@ -89,6 +112,16 @@ export default function DoctorAvailability() {
                         )}
                       </td>
                     ))}
+                    <td className="p-2 border-b text-center">
+                      <AnimatedButton 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteDoctor(doctor.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </AnimatedButton>
+                    </td>
                   </tr>
                 ))}
               </tbody>
