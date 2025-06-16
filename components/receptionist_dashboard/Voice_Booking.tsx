@@ -4,8 +4,8 @@ import { useState } from "react"
 import { MicIcon, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import VoiceInput from "@/components/receptionist/voice-input"
-import AppointmentForm from "@/components/receptionist/appointment-form"
+import VoiceInput from "@/components/receptionist_dashboard/voice-input"
+import AppointmentForm from "@/components/receptionist_dashboard/appointment-form"
 
 interface EnhancedVoiceBookingProps {
   onAppointmentCreated: () => void

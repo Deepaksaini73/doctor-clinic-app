@@ -12,7 +12,7 @@ import {
 import { AnimatedButton } from "@/components/ui/animated-button"
 import { CardSkeleton } from "@/components/ui/loading-skeleton"
 
-export default function EnhancedRecentPatients() {
+export default function RecentPatients() {
   const [isLoading, setIsLoading] = useState(false)
   const [recentPatients, setRecentPatients] = useState([
     {

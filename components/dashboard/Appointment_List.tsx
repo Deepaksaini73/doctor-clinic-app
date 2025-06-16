@@ -13,7 +13,7 @@ interface EnhancedAppointmentListProps {
   appointments: Appointment[]
 }
 
-export default function EnhancedAppointmentList({ appointments }: EnhancedAppointmentListProps) {
+export default function AppointmentList({ appointments }: EnhancedAppointmentListProps) {
   return (
     <Card>
       <CardHeader>

@@ -2,9 +2,9 @@
 
 import { useState } from "react"
 import MainLayout from "@/components/layout/main-layout"
-import EnhancedUsersList from "@/components/users_dashboard/Enhanced_Users_List"
-import EnhancedCreateUser from "@/components/users_dashboard/Enhanced_Create_User"
-import EnhancedUsersStats from "@/components/users_dashboard/Enhanced_Users_Stats"
+import UsersList from "@/components/users_dashboard/Users_List"
+import CreateUser from "@/components/users_dashboard/Create_User"
+import UsersStats from "@/components/users_dashboard/Users_Stats"
 
 export default function UsersPage() {
   const [users, setUsers] = useState([
@@ -92,7 +92,7 @@ export default function UsersPage() {
     <MainLayout title="User Management" subtitle="Manage system users and their access permissions">
       <div className="space-y-6">
         {/* Statistics Cards */}
-        <EnhancedUsersStats
+        <UsersStats
           totalUsers={totalUsers}
           adminUsers={adminUsers}
           doctorUsers={doctorUsers}
@@ -102,7 +102,7 @@ export default function UsersPage() {
         {/* Users List */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">System Users</h2>
-          <EnhancedCreateUser
+          <CreateUser
             isOpen={isCreateModalOpen}
             onOpenChange={setIsCreateModalOpen}
             newUser={newUser}
@@ -111,7 +111,7 @@ export default function UsersPage() {
             onGenerateCredentials={generateCredentials}
           />
         </div>
-        <EnhancedUsersList users={users} />
+        <UsersList users={users} />
       </div>
     </MainLayout>
   )

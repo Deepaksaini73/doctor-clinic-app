@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { Button } from "@/components/ui/button"
 import { Download } from "lucide-react"
-import EnhancedStatisticsCards from "@/components/dashboard/Enhanced_Statistics_Cards"
-import EnhancedPatientStatistics from "@/components/dashboard/Enhanced_Patient_Statistics"
-import EnhancedAppointmentList from "@/components/dashboard/Enhanced_Appointment_List"
-import EnhancedRecentPatients from "@/components/dashboard/Enhanced_Recent_Patients"
+import StatisticsCards from "@/components/dashboard/Statistics_Cards"
+import PatientStatistics from "@/components/dashboard/Patient_Statistics"
+import AppointmentList from "@/components/dashboard/Appointment_List"
+import RecentPatients from "@/components/dashboard/Recent_Patients"
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
@@ -106,18 +106,18 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <EnhancedStatisticsCards stats={stats} />
+        <StatisticsCards stats={stats} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Patient Statistics Chart */}
-          <EnhancedPatientStatistics totalPatients={73} growthRate={6.30} />
+          <PatientStatistics totalPatients={73} growthRate={6.30} />
 
           {/* Appointment List */}
-          <EnhancedAppointmentList appointments={appointments} />
+          <AppointmentList appointments={appointments} />
         </div>
 
         {/* Recent Patients */}
-        <EnhancedRecentPatients patients={recentPatients} />
+        <RecentPatients patients={recentPatients} />
       </div>
     </MainLayout>
   )

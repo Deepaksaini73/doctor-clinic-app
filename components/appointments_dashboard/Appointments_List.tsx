@@ -21,7 +21,7 @@ interface EnhancedAppointmentsListProps {
   onSearch: (query: string) => void
 }
 
-export default function EnhancedAppointmentsList({ appointments, onSearch }: EnhancedAppointmentsListProps) {
+export default function AppointmentsList({ appointments, onSearch }: EnhancedAppointmentsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -5,7 +5,7 @@ import { Users, UserCheck, Calendar, TrendingUp } from "lucide-react"
 import { StatCard } from "@/components/ui/enhanced-card"
 import { StatCardSkeleton } from "@/components/ui/loading-skeleton"
 
-export default function EnhancedStatisticsCards() {
+export default function StatisticsCards() {
   const [isLoading, setIsLoading] = useState(false)
   const [stats, setStats] = useState({
     totalPatients: 734,

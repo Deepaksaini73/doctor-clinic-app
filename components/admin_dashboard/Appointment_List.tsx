@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/enhanced-card"
 import { AnimatedButton } from "@/components/ui/animated-button"
 
-export default function EnhancedAppointmentList() {
+export default function AppointmentList() {
   return (
     <EnhancedCard hover gradient>
       <EnhancedCardHeader gradient>
