@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
-import EnhancedAppointmentHistory from "@/components/patient_dashboard/Enhanced_Appointment_History"
-import EnhancedMedicalHistory from "@/components/patient_dashboard/Enhanced_Medical_History"
+import AppointmentHistory from "@/components/patient_dashboard/Appointment_History"
+import MedicalHistory from "@/components/patient_dashboard/Medical_History"
 import type { Appointment } from "@/lib/types"
 
 export default function PatientPage() {
@@ -49,8 +49,8 @@ export default function PatientPage() {
           </p>
         </div>
 
-        <EnhancedAppointmentHistory appointments={appointments} isLoading={isLoading} />
-        <EnhancedMedicalHistory
+        <AppointmentHistory appointments={appointments} isLoading={isLoading} />
+        <MedicalHistory
           medicalRecords={medicalRecords}
           prescriptions={prescriptions}
           isLoading={isLoading}

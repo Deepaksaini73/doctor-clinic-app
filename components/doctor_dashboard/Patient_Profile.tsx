@@ -10,7 +10,7 @@ interface EnhancedPatientProfileProps {
   patient: Patient | null
 }
 
-export default function EnhancedPatientProfile({ appointment, patient }: EnhancedPatientProfileProps) {
+export default function PatientProfile({ appointment, patient }: EnhancedPatientProfileProps) {
   return (
     <Card>
       <CardHeader>

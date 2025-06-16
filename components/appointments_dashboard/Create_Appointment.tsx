@@ -24,7 +24,7 @@ interface EnhancedCreateAppointmentProps {
   onCreateAppointment: () => void
 }
 
-export default function EnhancedCreateAppointment({
+export default function CreateAppointment({
   isOpen,
   onOpenChange,
   newAppointment,

@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import MainLayout from "@/components/layout/main-layout"
-import EnhancedAppointmentsList from "@/components/appointments_dashboard/Enhanced_Appointments_List"
-import EnhancedCreateAppointment from "@/components/appointments_dashboard/Enhanced_Create_Appointment"
+import AppointmentsList from "@/components/appointments_dashboard/Appointments_List"
+import CreateAppointment from "@/components/appointments_dashboard/Create_Appointment"
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState([
@@ -112,7 +112,7 @@ export default function AppointmentsPage() {
             <h1 className="text-2xl font-semibold text-gray-900">List Appointments</h1>
             <p className="text-gray-600">Here is the latest update for the last 7 days, check now.</p>
           </div>
-          <EnhancedCreateAppointment
+          <CreateAppointment
             isOpen={isCreateModalOpen}
             onOpenChange={setIsCreateModalOpen}
             newAppointment={newAppointment}
@@ -122,7 +122,7 @@ export default function AppointmentsPage() {
         </div>
 
         {/* Appointments List */}
-        <EnhancedAppointmentsList appointments={filteredAppointments} onSearch={setSearchQuery} />
+        <AppointmentsList appointments={filteredAppointments} onSearch={setSearchQuery} />
       </div>
     </MainLayout>
   )

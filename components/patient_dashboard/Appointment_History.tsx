@@ -11,7 +11,7 @@ interface EnhancedAppointmentHistoryProps {
   isLoading: boolean
 }
 
-export default function EnhancedAppointmentHistory({ appointments, isLoading }: EnhancedAppointmentHistoryProps) {
+export default function AppointmentHistory({ appointments, isLoading }: EnhancedAppointmentHistoryProps) {
   const [activeTab, setActiveTab] = useState("upcoming")
 
   const upcomingAppointments = appointments.filter((app) => app.status === "scheduled")

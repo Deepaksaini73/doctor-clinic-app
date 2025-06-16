@@ -13,7 +13,7 @@ interface EnhancedPatientListProps {
   onSelectAppointment: (appointment: Appointment) => void
 }
 
-export default function EnhancedPatientList({
+export default function PatientList({
   appointments,
   selectedAppointment,
   isLoading,

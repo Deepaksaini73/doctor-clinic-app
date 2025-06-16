@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import LoginForm from "@/components/doctor/login-form"
+import LoginForm from "@/components/doctor_dashboard/login-form"
 
 export default function AdminLoginPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)

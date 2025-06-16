@@ -19,7 +19,7 @@ interface EnhancedUsersListProps {
   users: User[]
 }
 
-export default function EnhancedUsersList({ users }: EnhancedUsersListProps) {
+export default function UsersList({ users }: EnhancedUsersListProps) {
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":

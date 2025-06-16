@@ -30,7 +30,7 @@ interface EnhancedMedicalHistoryProps {
   isLoading: boolean
 }
 
-export default function EnhancedMedicalHistory({ medicalRecords, prescriptions, isLoading }: EnhancedMedicalHistoryProps) {
+export default function MedicalHistory({ medicalRecords, prescriptions, isLoading }: EnhancedMedicalHistoryProps) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <Card>
