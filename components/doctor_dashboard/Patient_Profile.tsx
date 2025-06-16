@@ -232,7 +232,7 @@ export default function PatientProfile({ appointment, patient }: EnhancedPatient
                 <span className="font-medium">Gender:</span> {appointment?.gender}
               </p>
               <p>
-                <span className="font-medium">Contact:</span> {appointment?.contact}
+                <span className="font-medium">Contact:</span> {appointment?.mobileNumber}
               </p>
               <p>
                 <span className="font-medium">Patient ID:</span> {appointment.patientId}

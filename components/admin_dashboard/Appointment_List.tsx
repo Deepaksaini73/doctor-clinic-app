@@ -85,7 +85,7 @@ export default function AppointmentList() {
         </div>
       </EnhancedCardHeader>
       <EnhancedCardContent>
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[1380px] overflow-y-auto pr-2">
           {isLoading ? (
             <div className="text-center py-4 text-gray-500">Loading appointments...</div>
           ) : appointments.length === 0 ? (

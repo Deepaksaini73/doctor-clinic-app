@@ -122,18 +122,19 @@ export default function AnalyticsDashboard() {
 
   // Calculate time distribution from actual data
   const timeDistribution = appointments.reduce((acc: { [key: string]: number }, app) => {
-    const hour = app.time
+    const hour = app.time.split(':')[0] // Extract just the hour part
     acc[hour] = (acc[hour] || 0) + 1
     return acc
   }, {})
 
-  const timeDistributionArray = Object.entries(timeDistribution)
-    .map(([hour, count]) => ({ hour, count }))
-    .sort((a, b) => {
-      const timeA = new Date(`2000/01/01 ${a.hour}`).getTime()
-      const timeB = new Date(`2000/01/01 ${b.hour}`).getTime()
-      return timeA - timeB
-    })
+  // Create array with all hours (0-23) and initialize with 0 if no appointments
+  const timeDistributionArray = Array.from({ length: 24 }, (_, i) => {
+    const hour = i.toString().padStart(2, '0')
+    return {
+      hour: `${hour}:00`,
+      count: timeDistribution[hour] || 0
+    }
+  })
 
   // Prepare data for charts
   const statusData = [
@@ -291,9 +292,15 @@ export default function AnalyticsDashboard() {
           <ResponsiveContainer width="100%" height="100%">
             <RechartsLineChart data={timeDistributionArray}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" />
+              <XAxis 
+                dataKey="hour" 
+                tickFormatter={(hour) => hour.split(':')[0] + 'h'} // Format as "Xh"
+              />
               <YAxis />
-              <Tooltip />
+              <Tooltip 
+                formatter={(value: number) => [`${value} appointments`, 'Count']}
+                labelFormatter={(hour) => `${hour.split(':')[0]}:00`}
+              />
               <Legend />
               <Line type="monotone" dataKey="count" stroke="#8884d8" activeDot={{ r: 8 }} />
             </RechartsLineChart>

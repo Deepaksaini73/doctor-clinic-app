@@ -103,11 +103,16 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
     }
   }
 
-  // Calculate pagination
-  const totalPages = Math.ceil(appointments.length / itemsPerPage)
+  const filteredAppointments = appointments.filter(appointment => {
+    if (statusFilter === "all") return true
+    return appointment.status === statusFilter
+  })
+
+  // Calculate pagination for filtered appointments
+  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const currentAppointments = appointments.slice(startIndex, endIndex)
+  const currentAppointments = filteredAppointments.slice(startIndex, endIndex)
 
   // Generate page numbers
   const getPageNumbers = () => {
@@ -158,11 +163,6 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
     return pages
   }
 
-  const filteredAppointments = appointments.filter(appointment => {
-    if (statusFilter === "all") return true
-    return appointment.status === statusFilter
-  })
-
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -207,9 +207,9 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAppointments.map((appointment, index) => (
+            {currentAppointments.map((appointment, index) => (
               <TableRow key={appointment.id}>
-                <TableCell>{index + 1}</TableCell>
+                <TableCell>{startIndex + index + 1}</TableCell>
                 <TableCell>{appointment.patientId}</TableCell>
                 <TableCell>
                   {appointment.patientName} ({appointment.patientAge} years)

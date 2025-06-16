@@ -64,46 +64,56 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
       toast({
         title: "No symptoms",
         description: "Please enter symptoms to get AI suggestions.",
-      })
-      return
+      });
+      return;
     }
 
-    setIsSuggesting(true)
+    setIsSuggesting(true);
 
     try {
-      // This is where you would integrate with your ML prescription suggestion system
-      // For now, we'll use the mock API
-      const response = await fetch("/api/ai/suggest", {
+      console.log("Sending symptoms to API:", symptoms);
+      const response = await fetch("/api/medicines", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ symptoms }),
-      })
+        body: JSON.stringify({
+          symptoms: symptoms.map(s => s.trim())
+        }),
+      });
 
-      if (!response.ok) throw new Error("Failed to get AI suggestions")
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(errorData.error || "Failed to get AI suggestions");
+      }
 
-      const data = await response.json()
+      const data = await response.json();
+      console.log("Received data from API:", data);
 
-      setMedicines(data.medicines)
-      setInstructions(data.instructions)
-      setFollowUp(data.followUp || "No follow-up needed")
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid response format from API");
+      }
+
+      setMedicines(data);
+      setInstructions("");
+      setFollowUp("");
 
       toast({
         title: "AI Suggestions Generated",
         description: "Prescription suggestions have been generated based on symptoms.",
-      })
+      });
     } catch (error) {
-      console.error("Error getting AI suggestions:", error)
+      console.error("Error getting AI suggestions:", error);
       toast({
         title: "Error",
-        description: "Failed to get AI suggestions. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to get AI suggestions. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSuggesting(false)
+      setIsSuggesting(false);
     }
-  }
+  };
 
   const handleAddMedicine = () => {
     if (!newMedicine.name || !newMedicine.dosage || !newMedicine.frequency || !newMedicine.duration) {
@@ -182,6 +192,37 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
         ...appointment,
         status: 'completed'
       })
+
+      // Update doctor's total patients count
+      const doctorRef = ref(database, `doctors/${appointment.doctorId}`)
+      const doctorSnapshot = await get(doctorRef)
+      
+      if (doctorSnapshot.exists()) {
+        const doctorData = doctorSnapshot.val()
+        const currentTotalPatients = doctorData.totalPatients || 0
+        
+        // Get all appointments for this doctor
+        const appointmentsRef = ref(database, 'appointments')
+        const appointmentsSnapshot = await get(appointmentsRef)
+        
+        if (appointmentsSnapshot.exists()) {
+          const appointments = appointmentsSnapshot.val()
+          // Count unique patients with completed appointments for this doctor
+          const uniquePatients = new Set()
+          
+          Object.values(appointments).forEach((app: any) => {
+            if (app.doctorId === appointment.doctorId && app.status === 'completed') {
+              uniquePatients.add(app.patientId)
+            }
+          })
+          
+          // Update doctor's total patients count
+          await set(doctorRef, {
+            ...doctorData,
+            totalPatients: uniquePatients.size
+          })
+        }
+      }
 
       toast({
         title: "Prescription Saved",
