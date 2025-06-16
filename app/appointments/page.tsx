@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
-<<<<<<< Updated upstream
+
 import EnhancedAppointmentsList from "@/components/appointments_dashboard/Enhanced_Appointments_List"
 import EnhancedCreateAppointment from "@/components/appointments_dashboard/Enhanced_Create_Appointment"
-=======
+
 import AppointmentsList from "@/components/appointments_dashboard/Appointments_List"
 import CreateAppointment from "@/components/appointments_dashboard/Create_Appointment"
 import { database } from "@/lib/firebase"
@@ -21,7 +21,7 @@ interface Appointment {
   notes: string
   createdAt?: string
 }
->>>>>>> Stashed changes
+
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
