@@ -6,37 +6,44 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import type { Appointment } from "@/lib/types"
 
 interface EnhancedAppointmentHistoryProps {
   appointments: Appointment[]
   isLoading: boolean
+  onPatientSelect: (patientId: string) => void
+  selectedPatientId: string | null
 }
 
-export default function AppointmentHistory({ appointments, isLoading }: EnhancedAppointmentHistoryProps) {
+export default function AppointmentHistory({ 
+  appointments = [], // Add default empty array
+  isLoading,
+  onPatientSelect,
+  selectedPatientId 
+}: EnhancedAppointmentHistoryProps) {
   const [activeTab, setActiveTab] = useState("upcoming")
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [sortBy, setSortBy] = useState<"date" | "doctor">("date")
 
-  const filteredAppointments = appointments
-    .filter((app) => app.status === (activeTab === "upcoming" ? "scheduled" : "completed"))
+  // Add safe filtering with null checks
+  const filteredAppointments = (appointments || [])
+    .filter((app) => app?.status === (activeTab === "upcoming" ? "scheduled" : "completed"))
     .filter((app) => 
-      app.patientName.toLowerCase().includes(searchQuery.toLowerCase())
+      app?.patientName?.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
       if (sortBy === "date") {
         return new Date(b.date).getTime() - new Date(a.date).getTime()
       }
-      return a.patientName.localeCompare(b.patientName) // Changed from doctorName to patientName
+      return (a.patientName || '').localeCompare(b.patientName || '')
     })
+
+  // Update appointments count with null check
+  const upcomingCount = (appointments || [])
+    .filter(app => app?.status === "scheduled").length
+  const pastCount = (appointments || [])
+    .filter(app => app?.status === "completed").length
 
   const getPriorityBadge = (priority: string) => {
     const colors = {
@@ -82,13 +89,13 @@ export default function AppointmentHistory({ appointments, isLoading }: Enhanced
             className={`px-4 py-2 font-medium text-sm ${activeTab === "upcoming" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
             onClick={() => setActiveTab("upcoming")}
           >
-            Upcoming ({appointments.filter(app => app.status === "scheduled").length})
+            Upcoming ({upcomingCount})
           </button>
           <button
             className={`px-4 py-2 font-medium text-sm ${activeTab === "past" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
             onClick={() => setActiveTab("past")}
           >
-            Past ({appointments.filter(app => app.status === "completed").length})
+            Past ({pastCount})
           </button>
         </div>
 
@@ -99,11 +106,12 @@ export default function AppointmentHistory({ appointments, isLoading }: Enhanced
         ) : (
           <div className="space-y-4 overflow-y-auto max-h-[600px] pr-2 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
             {filteredAppointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => setSelectedAppointment(appointment)}
-              >
+                <div
+                  key={appointment.id}
+                  className={`border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer
+                    ${selectedPatientId === appointment.patientId ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+                  onClick={() => onPatientSelect(appointment.patientId)}
+                >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
@@ -131,10 +139,12 @@ export default function AppointmentHistory({ appointments, isLoading }: Enhanced
                         <Clock className="h-4 w-4 text-gray-400 ml-2" />
                         <span className="text-sm text-gray-600">{appointment.time}</span>
                       </div>
-                      {appointment.symptoms.length > 0 && (
+                      {(appointment.symptoms || []).length > 0 && ( // Add null check for symptoms
                         <div className="flex items-start gap-2">
                           <AlertCircle className="h-4 w-4 text-gray-400 mt-0.5" />
-                          <p className="text-sm text-gray-600">{appointment.symptoms.join(", ")}</p>
+                          <p className="text-sm text-gray-600">
+                            {(appointment.symptoms || []).join(", ")}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -162,72 +172,6 @@ export default function AppointmentHistory({ appointments, isLoading }: Enhanced
           </div>
         )}
       </CardContent>
-
-      <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
-        <DialogContent className="text-black sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Appointment Details</DialogTitle>
-          </DialogHeader>
-          {selectedAppointment && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-                  <User className="h-8 w-8 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-xl">{selectedAppointment.patientName}</h3>
-                  <p className="text-gray-600">
-                    {selectedAppointment.patientAge} years • {selectedAppointment.gender}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">Doctor</p>
-                  <p className="font-medium">Dr. {selectedAppointment.doctorName}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">Contact</p>
-                  <p className="font-medium flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    {selectedAppointment.mobileNumber}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">Date</p>
-                  <p className="font-medium">
-                    {format(new Date(selectedAppointment.date), "MMMM d, yyyy")}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">Time</p>
-                  <p className="font-medium">{selectedAppointment.time}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">Priority</p>
-                  <div>{getPriorityBadge(selectedAppointment.priority)}</div>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">Status</p>
-                  <Badge variant="outline">{selectedAppointment.status}</Badge>
-                </div>
-              </div>
-
-              {selectedAppointment.symptoms.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500">Symptoms</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedAppointment.symptoms.map((symptom, index) => (
-                      <Badge key={index} variant="secondary">{symptom}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </Card>
   )
 }

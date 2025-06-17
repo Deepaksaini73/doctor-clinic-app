@@ -279,7 +279,12 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
                           <p className="text-sm text-gray-600">{appointment.doctorName}</p>
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600 mb-3">{appointment.symptoms.join(", ")}</p>
+                      {/* Update symptoms rendering with null check */}
+                      {appointment.symptoms && appointment.symptoms.length > 0 && (
+                        <p className="text-sm text-gray-600 mb-3">
+                          {appointment.symptoms.join(", ")}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2">
                         {getStatusBadge(appointment.status)}
                         {getPriorityBadge(appointment.priority)}

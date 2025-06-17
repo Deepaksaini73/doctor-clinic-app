@@ -39,6 +39,7 @@ interface MedicalRecord {
 
 interface Prescription {
   id: string
+  patientId: string
   date: string
   doctorName: string
   medications: {
@@ -50,11 +51,14 @@ interface Prescription {
 }
 
 export default function PatientPage() {
+    const [selectedPatient, setSelectedPatient] = useState<string | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([])
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
+
+
 
   useEffect(() => {
     // Fetch appointments
@@ -113,15 +117,35 @@ export default function PatientPage() {
     }
   }, [])
 
+  const selectedPatientRecords = medicalRecords.filter(
+    record => record.patientId === selectedPatient
+  )
+  const selectedPatientPrescriptions = prescriptions.filter(
+    prescription => prescription.patientId === selectedPatient
+  )
+
   return (
     <MainLayout title="Patient Dashboard" subtitle="View your appointments, medical history, and prescriptions">
       <div className="space-y-6">
-        <AppointmentHistory appointments={appointments} isLoading={isLoading} />
-        <MedicalHistory
-          medicalRecords={medicalRecords}
-          prescriptions={prescriptions}
+        <AppointmentHistory 
+          appointments={appointments} 
           isLoading={isLoading}
+          onPatientSelect={(patientId) => setSelectedPatient(patientId)}
+          selectedPatientId={selectedPatient}
         />
+        
+        {selectedPatient ? (
+          <MedicalHistory
+            // medicalRecords={selectedPatientRecords}
+            prescriptions={selectedPatientPrescriptions}
+            isLoading={isLoading}
+          />
+        ) : (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
+            <h3 className="text-lg font-medium text-gray-900">No Patient Selected</h3>
+            <p className="text-gray-500">Select a patient from above to view their medical history</p>
+          </div>
+        )}
       </div>
     </MainLayout>
   )
