@@ -39,14 +39,18 @@ export interface Appointment {
   patientId: string
   patientName: string
   patientAge: number
+  gender: string
+  mobileNumber: string
   doctorId: string
   doctorName: string
   date: string
   time: string
-  symptoms: string[]
+  symptoms?: string[]
   status: "scheduled" | "in-progress" | "completed" | "cancelled"
   priority: "routine" | "urgent" | "emergency"
   notes?: string
+  diagnosis?: string
+  createdAt: string
 }
 
 export interface Prescription {
@@ -54,6 +58,7 @@ export interface Prescription {
   medicines: Medicine[]
   instructions: string
   followUp?: string
+  diagnosis: string
 }
 
 export interface Medicine {

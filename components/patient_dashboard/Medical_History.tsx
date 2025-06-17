@@ -1,9 +1,10 @@
 "use client"
 
-import { Pill, Calendar, Clock, User, AlertCircle, Stethoscope } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Pill, Calendar, Clock, User, AlertCircle, Stethoscope, Loader2 } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
+import { Table, TableHeader, TableBody, TableCell, TableRow, TableHead } from "@/components/ui/table"
 
 const formatSafeDate = (dateString: string): string => {
   try {
@@ -11,7 +12,7 @@ const formatSafeDate = (dateString: string): string => {
     if (isNaN(date.getTime())) {
       return dateString
     }
-    return format(date, "MMMM d, yyyy 'at' h:mm a")
+    return format(date, "dd/MM/yyyy")
   } catch (error) {
     console.error("Date formatting error:", error)
     return dateString
@@ -25,6 +26,7 @@ interface Prescription {
   department?: string
   status?: string
   symptoms?: string[]
+  diagnosis: string
   medications: {
     name: string
     dosage: string
@@ -41,138 +43,112 @@ interface EnhancedMedicalHistoryProps {
   isLoading: boolean
 }
 
-export default function MedicalHistory({ prescriptions, isLoading }: EnhancedMedicalHistoryProps) {
+export default function EnhancedMedicalHistory({ prescriptions, isLoading }: EnhancedMedicalHistoryProps) {
   return (
-    <Card className="h-[600px]">
-      <CardHeader className="border-b">
-        <CardTitle className="flex items-center gap-2">
-          <Pill className="h-5 w-5 text-blue-600" />
+    <Card className="h-full shadow-lg border-0">
+      <CardHeader className="border-b bg-gray-50/50">
+        <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+          <Stethoscope className="h-6 w-6 text-blue-600" />
           Medical History
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-6 pt-4">
         {isLoading ? (
-          <div className="flex justify-center items-center h-[500px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        ) : prescriptions.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <Stethoscope className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Medical Records</h3>
+            <p className="text-gray-500">No medical history available for this patient</p>
           </div>
         ) : (
-          <div className="h-[500px] overflow-y-auto px-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-            <div className="space-y-4 py-4">
-              {prescriptions.map((prescription) => (
-                <div key={prescription.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                  {/* Header with date and status */}
-                  <div className="bg-blue-50 p-4 border-b hover:bg-blue-100 transition-colors">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium text-blue-900">
-                          {formatSafeDate(prescription.date)}
-                        </span>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className="capitalize bg-white border-blue-200 text-blue-700"
-                      >
-                        {prescription.status || "Prescribed"}
+          <div className="space-y-6 overflow-y-auto max-h-[700px] pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+            {prescriptions.map((prescription) => (
+              <Card key={prescription.id} className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                <CardHeader className="bg-gray-50/50 border-b p-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg font-semibold">Visit on {formatSafeDate(prescription.date)}</CardTitle>
+                      <CardDescription className="mt-1 text-gray-600">Doctor: {prescription.doctorName}</CardDescription>
+                    </div>
+                    {prescription.status && (
+                      <Badge variant={prescription.status === 'completed' ? 'default' : 'secondary'}>
+                        {prescription.status}
                       </Badge>
-                    </div>
-                  </div>
-
-                  {/* Main content */}
-                  <div className="p-4 space-y-4">
-                    {/* Doctor Information */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <User className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">Dr. {prescription.doctorName}</h3>
-                        <p className="text-sm text-gray-600">{prescription.department || "General Medicine"}</p>
-                      </div>
-                    </div>
-
-                    {/* Symptoms if available */}
-                    {prescription.symptoms && prescription.symptoms.length > 0 && (
-                      <div className="border-t pt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertCircle className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-700">Symptoms</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {prescription.symptoms.map((symptom, idx) => (
-                            <Badge key={idx} variant="secondary">{symptom}</Badge>
-                          ))}
-                        </div>
-                      </div>
                     )}
-
-                    {/* Medications */}
-                    <div className="border-t pt-3">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Pill className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-700">Medications</span>
-                      </div>
-                      <div className="space-y-3">
-                        {prescription.medications.map((med, index) => (
-                          <div
-                            key={index}
-                            className="bg-gray-50 rounded-lg p-3 border border-gray-100"
-                          >
-                            <div className="flex justify-between items-start">
-                              <h4 className="font-medium text-gray-900">{med.name}</h4>
-                              <Badge>{med.dosage}</Badge>
-                            </div>
-                            <div className="mt-2 grid grid-cols-2 gap-2">
-                              <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm text-gray-600">{med.frequency}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm text-gray-600">{med.duration}</span>
-                              </div>
-                            </div>
-                            {med.notes && (
-                              <p className="text-sm text-gray-500 border-t mt-2 pt-2">
-                                {med.notes}
-                              </p>
-                            )}
-                          </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  {prescription.symptoms && prescription.symptoms.length > 0 && (
+                    <div>
+                      <h3 className="font-medium mb-3 text-gray-900">Symptoms</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {prescription.symptoms.map((symptom, index) => (
+                          <Badge key={index} variant="outline" className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full">
+                            {symptom}
+                          </Badge>
                         ))}
                       </div>
                     </div>
-
-                    {/* Additional Instructions if available */}
-                    {prescription.instructions && (
-                      <div className="border-t pt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Stethoscope className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-700">Instructions</span>
-                        </div>
-                        <p className="text-sm text-gray-600">{prescription.instructions}</p>
-                      </div>
-                    )}
-
-                    {/* Follow-up Details if available */}
-                    {prescription.followUp && (
-                      <div className="border-t pt-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm text-blue-600">
-                            Follow-up on {formatSafeDate(prescription.followUp)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                  )}
+                  
+                  <div>
+                    <h3 className="font-medium mb-3 text-gray-900">Diagnosis</h3>
+                    <p className="text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200">{prescription.diagnosis}</p>
                   </div>
-                </div>
-              ))}
-              {prescriptions.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  {isLoading ? "Loading..." : "No prescriptions found for this patient"}
-                </div>
-              )}
-            </div>
+
+                  <div>
+                    <h3 className="font-medium mb-3 text-gray-900">Medications</h3>
+                    <div className="rounded-lg border border-gray-200 overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-100">
+                            <TableHead className="text-gray-700 font-semibold">Medicine</TableHead>
+                            <TableHead className="text-gray-700 font-semibold">Dosage</TableHead>
+                            <TableHead className="text-gray-700 font-semibold">Frequency</TableHead>
+                            <TableHead className="text-gray-700 font-semibold">Duration</TableHead>
+                            {prescription.medications.some(med => med.notes) && (
+                              <TableHead className="text-gray-700 font-semibold">Notes</TableHead>
+                            )}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {prescription.medications.map((medicine, index) => (
+                            <TableRow key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <TableCell className="font-medium text-gray-800">{medicine.name}</TableCell>
+                              <TableCell className="text-gray-700">{medicine.dosage}</TableCell>
+                              <TableCell className="text-gray-700">{medicine.frequency}</TableCell>
+                              <TableCell className="text-gray-700">{medicine.duration}</TableCell>
+                              {medicine.notes && (
+                                <TableCell className="text-gray-700">{medicine.notes}</TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  {prescription.instructions && (
+                    <div>
+                      <h3 className="font-medium mb-3 text-gray-900">Instructions</h3>
+                      <p className="text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200">{prescription.instructions}</p>
+                    </div>
+                  )}
+
+                  {prescription.followUp && (
+                    <div>
+                      <h3 className="font-medium mb-3 text-gray-900">Follow-up</h3>
+                      <p className="text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200">{prescription.followUp}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </CardContent>

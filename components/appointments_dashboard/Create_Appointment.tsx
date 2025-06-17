@@ -21,6 +21,13 @@ interface Patient {
   contact: string
 }
 
+// Add interface for Doctor
+interface Doctor {
+  id: string;
+  name: string;
+  specialization: string;
+}
+
 export default function CreateAppointment({
   isOpen,
   onOpenChange,
@@ -159,7 +166,7 @@ export default function CreateAppointment({
 
       if (snapshot.exists()) {
         const patientsData = snapshot.val()
-        const patient = Object.values(patientsData).find((p: any) => p.patientId === searchPatientId)
+        const patient = Object.values(patientsData).find((p: any) => p.patientId === searchPatientId) as Patient;
 
         if (patient) {
           setFormData({
@@ -195,51 +202,53 @@ export default function CreateAppointment({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="text-black max-w-[95vw] md:max-w-[800px] h-[90vh] md:h-auto overflow-y-auto">
-        <DialogHeader className="mb-6">
-          <DialogTitle className="text-2xl font-bold text-gray-900">Create New Appointment</DialogTitle>
+      <DialogContent className="text-black max-w-[95vw] md:max-w-[800px] h-[90vh] md:h-auto overflow-y-auto rounded-lg shadow-xl p-6 md:p-8">
+        <DialogHeader className="mb-6 text-center">
+          <DialogTitle className="text-3xl font-extrabold text-blue-800">Create New Appointment</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Left Column */}
             <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-5 bg-blue-50 rounded-xl border border-blue-200 shadow-sm">
                 <RadioGroup
                   defaultValue="new"
                   value={patientType}
                   onValueChange={(value) => setPatientType(value as "new" | "existing")}
-                  className="flex space-x-4"
+                  className="flex space-x-6"
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="new" id="new" />
-                    <Label htmlFor="new">New Patient</Label>
+                  <div className="flex items-center space-x-2 text-blue-800 font-medium">
+                    <RadioGroupItem value="new" id="new" className="border-blue-400 text-blue-600 focus:ring-blue-500" />
+                    <Label htmlFor="new" className="cursor-pointer">New Patient</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="existing" id="existing" />
-                    <Label htmlFor="existing">Existing Patient</Label>
+                  <div className="flex items-center space-x-2 text-blue-800 font-medium">
+                    <RadioGroupItem value="existing" id="existing" className="border-blue-400 text-blue-600 focus:ring-blue-500" />
+                    <Label htmlFor="existing" className="cursor-pointer">Existing Patient</Label>
                   </div>
                 </RadioGroup>
 
                 {patientType === "existing" && (
-                  <div className="mt-4 space-y-2">
-                    <Label>Patient ID</Label>
-                    <div className="flex gap-2">
+                  <div className="mt-6 space-y-3">
+                    <Label className="text-gray-700">Patient ID</Label>
+                    <div className="flex gap-3">
                       <Input
                         placeholder="Enter patient ID"
                         value={searchPatientId}
                         onChange={(e) => setSearchPatientId(e.target.value)}
+                        className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         onClick={handlePatientSearch}
                         disabled={isSearching}
+                        className="bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm w-12 h-10 flex items-center justify-center"
                       >
                         {isSearching ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
-                          <Search className="h-4 w-4" />
+                          <Search className="h-5 w-5" />
                         )}
                       </Button>
                     </div>
@@ -247,40 +256,40 @@ export default function CreateAppointment({
                 )}
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="patientName">Patient Name *</Label>
+                  <Label htmlFor="patientName" className="text-gray-700">Patient Name <span className="text-red-500">*</span></Label>
                   <Input
                     id="patientName"
                     value={formData.patientName}
                     onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                     required
-                    className="bg-white"
+                    className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="age">Age *</Label>
+                    <Label htmlFor="age" className="text-gray-700">Age <span className="text-red-500">*</span></Label>
                     <Input
                       id="age"
                       type="number"
                       value={formData.patientAge}
                       onChange={(e) => setFormData({ ...formData, patientAge: e.target.value })}
                       required
-                      className="bg-white"
+                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="gender">Gender *</Label>
+                    <Label htmlFor="gender" className="text-gray-700">Gender <span className="text-red-500">*</span></Label>
                     <Select
                       value={formData.patientGender}
                       onValueChange={(value) => setFormData({ ...formData, patientGender: value })}
                     >
-                      <SelectTrigger className="bg-white">
+                      <SelectTrigger className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm data-[placeholder]:text-gray-400">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white border-gray-200 shadow-lg">
                         <SelectItem value="male">Male</SelectItem>
                         <SelectItem value="female">Female</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
@@ -290,13 +299,13 @@ export default function CreateAppointment({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="contact">Contact Number *</Label>
+                  <Label htmlFor="contact" className="text-gray-700">Contact Number <span className="text-red-500">*</span></Label>
                   <Input
                     id="contact"
                     value={formData.contactNumber}
                     onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
                     required
-                    className="bg-white"
+                    className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -304,17 +313,17 @@ export default function CreateAppointment({
 
             {/* Right Column */}
             <div className="space-y-6">
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="doctor">Select Doctor *</Label>
+                  <Label htmlFor="doctor" className="text-gray-700">Select Doctor <span className="text-red-500">*</span></Label>
                   <Select
                     value={formData.doctorId}
                     onValueChange={(value) => setFormData({ ...formData, doctorId: value })}
                   >
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm data-[placeholder]:text-gray-400">
                       <SelectValue placeholder={doctors.length ? "Select doctor" : "No doctors available"} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white border-gray-200 shadow-lg">
                       {doctors?.length > 0 ? (
                         doctors.map((doctor) => (
                           <SelectItem key={doctor.id} value={doctor.id}>
@@ -332,7 +341,7 @@ export default function CreateAppointment({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="date">Date *</Label>
+                    <Label htmlFor="date" className="text-gray-700">Date <span className="text-red-500">*</span></Label>
                     <Input
                       id="date"
                       type="date"
@@ -340,43 +349,43 @@ export default function CreateAppointment({
                       onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
                       min={new Date().toISOString().split('T')[0]}
                       required
-                      className="bg-white"
+                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="time">Time *</Label>
+                    <Label htmlFor="time" className="text-gray-700">Time <span className="text-red-500">*</span></Label>
                     <Input
                       id="time"
                       type="time"
                       value={formData.appointmentTime}
                       onChange={(e) => setFormData({ ...formData, appointmentTime: e.target.value })}
                       required
-                      className="bg-white"
+                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="symptoms">Symptoms</Label>
+                  <Label htmlFor="symptoms" className="text-gray-700">Symptoms</Label>
                   <Input
                     id="symptoms"
                     placeholder="Enter symptoms (comma separated)"
                     value={formData.symptoms}
                     onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
-                    className="bg-white"
+                    className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="priority">Priority</Label>
+                  <Label htmlFor="priority" className="text-gray-700">Priority</Label>
                   <Select
                     value={formData.priority}
                     onValueChange={(value) => setFormData({ ...formData, priority: value })}
                   >
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm data-[placeholder]:text-gray-400">
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white border-gray-200 shadow-lg">
                       <SelectItem value="routine">Routine</SelectItem>
                       <SelectItem value="urgent">Urgent</SelectItem>
                       <SelectItem value="emergency">Emergency</SelectItem>
@@ -387,10 +396,10 @@ export default function CreateAppointment({
             </div>
           </div>
 
-          <div className="pt-6 border-t">
+          <div className="pt-8 border-t border-gray-200">
             <Button 
               type="submit" 
-              className="w-full bg-blue-600 text-white hover:bg-blue-700 h-11 text-lg"
+              className="w-full bg-blue-600 text-white hover:bg-blue-700 h-12 text-lg font-semibold shadow-md transition-all duration-200"
               disabled={!doctors?.length}
             >
               {doctors?.length ? "Create Appointment" : "No doctors available"}

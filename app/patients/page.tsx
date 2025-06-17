@@ -7,6 +7,7 @@ import MedicalHistory from "@/components/patient_dashboard/Medical_History"
 import { database } from "@/lib/firebase"
 import { ref, onValue } from "firebase/database"
 import { useToast } from "@/components/ui/use-toast"
+import { User } from "lucide-react"
 
 interface Appointment {
   id: string
@@ -42,12 +43,18 @@ interface Prescription {
   patientId: string
   date: string
   doctorName: string
+  diagnosis: string
   medications: {
     name: string
     dosage: string
     frequency: string
     duration: string
+    notes?: string
   }[]
+  symptoms?: string[]
+  status?: string
+  instructions?: string
+  followUp?: string
 }
 
 export default function PatientPage() {
@@ -126,26 +133,38 @@ export default function PatientPage() {
 
   return (
     <MainLayout title="Patient Dashboard" subtitle="View your appointments, medical history, and prescriptions">
-      <div className="space-y-6">
-        <AppointmentHistory 
-          appointments={appointments} 
-          isLoading={isLoading}
-          onPatientSelect={(patientId) => setSelectedPatient(patientId)}
-          selectedPatientId={selectedPatient}
-        />
-        
-        {selectedPatient ? (
-          <MedicalHistory
-            // medicalRecords={selectedPatientRecords}
-            prescriptions={selectedPatientPrescriptions}
+      <div className={`grid gap-6 transition-all duration-300 ease-in-out ${
+        selectedPatient ? 'lg:grid-cols-2' : 'lg:grid-cols-1'
+      }`}>
+        <div>
+          <AppointmentHistory 
+            appointments={appointments} 
             isLoading={isLoading}
+            onPatientSelect={(patientId) => setSelectedPatient(patientId)}
+            selectedPatientId={selectedPatient}
           />
-        ) : (
-          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-            <h3 className="text-lg font-medium text-gray-900">No Patient Selected</h3>
-            <p className="text-gray-500">Select a patient from above to view their medical history</p>
-          </div>
-        )}
+        </div>
+        
+        <div className={`transition-all duration-300 ease-in-out ${
+          selectedPatient ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 lg:absolute lg:right-0'
+        }`}>
+          {selectedPatient ? (
+            <MedicalHistory
+              prescriptions={selectedPatientPrescriptions}
+              isLoading={isLoading}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed p-8">
+              <div className="text-center">
+                <div className="mx-auto h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                  <User className="h-6 w-6 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Patient Selected</h3>
+                <p className="text-gray-500">Select a patient from the appointment history to view their medical records</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </MainLayout>
   )
