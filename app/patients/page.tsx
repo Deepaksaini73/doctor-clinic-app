@@ -116,13 +116,6 @@ export default function PatientPage() {
   return (
     <MainLayout title="Patient Dashboard" subtitle="View your appointments, medical history, and prescriptions">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Patient Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            View your appointments, medical history, and prescriptions
-          </p>
-        </div>
-
         <AppointmentHistory appointments={appointments} isLoading={isLoading} />
         <MedicalHistory
           medicalRecords={medicalRecords}
