@@ -1,11 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Search, Filter, MoreHorizontal } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Search } from "lucide-react"
 import { database } from "@/lib/firebase"
 import { ref, update, remove } from "firebase/database"
 import { useToast } from "@/components/ui/use-toast"
@@ -15,14 +13,40 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { MoreHorizontal } from "lucide-react"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
 
 interface Appointment {
   id: string
+  patientId: string
   patientName: string
-  notes: string
+  patientAge: number
+  gender: string
+  mobileNumber: string
+  doctorId: string
   doctorName: string
   date: string
-  status: string
+  time: string
+  symptoms: string[]
+  status: "scheduled" | "in-progress" | "completed" | "cancelled"
+  priority: "routine" | "urgent" | "emergency"
+  notes?: string
+  createdAt: string
 }
 
 interface AppointmentsListProps {
@@ -35,6 +59,7 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
   const [currentPage, setCurrentPage] = useState(1)
   const { toast } = useToast()
   const itemsPerPage = 10
+  const [statusFilter, setStatusFilter] = useState("all")
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value
@@ -78,11 +103,16 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
     }
   }
 
-  // Calculate pagination
-  const totalPages = Math.ceil(appointments.length / itemsPerPage)
+  const filteredAppointments = appointments.filter(appointment => {
+    if (statusFilter === "all") return true
+    return appointment.status === statusFilter
+  })
+
+  // Calculate pagination for filtered appointments
+  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const currentAppointments = appointments.slice(startIndex, endIndex)
+  const currentAppointments = filteredAppointments.slice(startIndex, endIndex)
 
   // Generate page numbers
   const getPageNumbers = () => {
@@ -133,116 +163,128 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
     return pages
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Completed</Badge>
-      case "Scheduled":
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Scheduled</Badge>
-      case "Cancelled":
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Cancelled</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Appointments</CardTitle>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search"
-                className="pl-10 w-64"
-                value={searchQuery}
-                onChange={handleSearch}
-              />
-            </div>
-            <Button variant="outline" size="sm">
-              <Filter className="w-4 h-4" />
-            </Button>
-          </div>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Appointments</h2>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Search appointments..."
+            value={searchQuery}
+            onChange={handleSearch}
+            className="w-64"
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="scheduled">Scheduled</SelectItem>
+              <SelectItem value="in-progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-medium text-gray-600">No</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Patient Name</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Notes</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Doctor Name</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Appointment Date</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentAppointments.map((appointment, index) => (
-                <tr key={appointment.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4">{startIndex + index + 1}</td>
-                  <td className="py-3 px-4 font-medium">{appointment.patientName}</td>
-                  <td className="py-3 px-4 text-gray-600 max-w-xs truncate">{appointment.notes}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">
-                          {appointment.doctorName.split(" ")[1]?.charAt(0)}
-                        </span>
-                      </div>
-                      {appointment.doctorName}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">{appointment.date}</td>
-                  <td className="py-3 px-4">{getStatusBadge(appointment.status)}</td>
-                  <td className="py-3 px-4">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {appointment.status !== 'Completed' && (
-                          <DropdownMenuItem
-                            onClick={() => handleStatusUpdate(appointment.id, 'Completed')}
-                          >
-                            Mark as Completed
-                          </DropdownMenuItem>
-                        )}
-                        {appointment.status !== 'Scheduled' && (
-                          <DropdownMenuItem
-                            onClick={() => handleStatusUpdate(appointment.id, 'Scheduled')}
-                          >
-                            Mark as Scheduled
-                          </DropdownMenuItem>
-                        )}
-                        {appointment.status !== 'Cancelled' && (
-                          <DropdownMenuItem
-                            onClick={() => handleStatusUpdate(appointment.id, 'Cancelled')}
-                          >
-                            Cancel Appointment
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => handleDeleteAppointment(appointment.id)}
-                        >
-                          Delete Appointment
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex items-center justify-between mt-4">
+      </div>
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>#</TableHead>
+              <TableHead>Patient ID</TableHead>
+              <TableHead>Patient</TableHead>
+              <TableHead>Gender</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Doctor</TableHead>
+              <TableHead>Date & Time</TableHead>
+              <TableHead>Symptoms</TableHead>
+              <TableHead>Priority</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {currentAppointments.map((appointment, index) => (
+              <TableRow key={appointment.id}>
+                <TableCell>{startIndex + index + 1}</TableCell>
+                <TableCell>{appointment.patientId}</TableCell>
+                <TableCell>
+                  {appointment.patientName} ({appointment.patientAge} years)
+                </TableCell>
+                <TableCell className="capitalize">{appointment.gender}</TableCell>
+                <TableCell>{appointment.mobileNumber}</TableCell>
+                <TableCell>{appointment.doctorName}</TableCell>
+                <TableCell>
+                  {new Date(appointment.date).toLocaleDateString()} {appointment.time}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {appointment.symptoms.map((symptom, i) => (
+                      <Badge key={i} variant="secondary">
+                        {symptom}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      appointment.priority === "emergency"
+                        ? "destructive"
+                        : appointment.priority === "urgent"
+                        ? "default"
+                        : "secondary"
+                    }
+                  >
+                    {appointment.priority}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      appointment.status === "completed"
+                        ? "default"
+                        : appointment.status === "cancelled"
+                        ? "destructive"
+                        : appointment.status === "in-progress"
+                        ? "secondary"
+                        : "outline"
+                    }
+                  >
+                    {appointment.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStatusUpdate(appointment.id, "cancelled")}
+                      disabled={appointment.status === "completed" || appointment.status === "cancelled"}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteAppointment(appointment.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 p-4 border-t">
           <p className="text-sm text-gray-600">
             Page {currentPage} of {totalPages}
           </p>
@@ -281,7 +323,7 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   )
 } 

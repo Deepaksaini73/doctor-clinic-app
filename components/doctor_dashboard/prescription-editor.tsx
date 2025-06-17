@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { Medicine, Appointment } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Plus, Trash2, Save, Download, Sparkles } from "lucide-react"
+import { Loader2, Plus, Trash2, Save, Download, Sparkles, Check } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ref, push, set, get } from "firebase/database"
+import { database } from "@/lib/firebase"
 
 interface PrescriptionEditorProps {
   appointment: Appointment | null
@@ -35,6 +37,8 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [medicineSearchResults, setMedicineSearchResults] = useState<Medicine[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [open, setOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false)
   const { toast } = useToast()
 
   // New medicine form state
@@ -60,46 +64,56 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
       toast({
         title: "No symptoms",
         description: "Please enter symptoms to get AI suggestions.",
-      })
-      return
+      });
+      return;
     }
 
-    setIsSuggesting(true)
+    setIsSuggesting(true);
 
     try {
-      // This is where you would integrate with your ML prescription suggestion system
-      // For now, we'll use the mock API
-      const response = await fetch("/api/ai/suggest", {
+      console.log("Sending symptoms to API:", symptoms);
+      const response = await fetch("/api/medicines", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ symptoms }),
-      })
+        body: JSON.stringify({
+          symptoms: symptoms.map(s => s.trim())
+        }),
+      });
 
-      if (!response.ok) throw new Error("Failed to get AI suggestions")
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(errorData.error || "Failed to get AI suggestions");
+      }
 
-      const data = await response.json()
+      const data = await response.json();
+      console.log("Received data from API:", data);
 
-      setMedicines(data.medicines)
-      setInstructions(data.instructions)
-      setFollowUp(data.followUp || "No follow-up needed")
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid response format from API");
+      }
+
+      setMedicines(data);
+      setInstructions("");
+      setFollowUp("");
 
       toast({
         title: "AI Suggestions Generated",
         description: "Prescription suggestions have been generated based on symptoms.",
-      })
+      });
     } catch (error) {
-      console.error("Error getting AI suggestions:", error)
+      console.error("Error getting AI suggestions:", error);
       toast({
         title: "Error",
-        description: "Failed to get AI suggestions. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to get AI suggestions. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSuggesting(false)
+      setIsSuggesting(false);
     }
-  }
+  };
 
   const handleAddMedicine = () => {
     if (!newMedicine.name || !newMedicine.dosage || !newMedicine.frequency || !newMedicine.duration) {
@@ -135,14 +149,84 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
     setIsLoading(true)
 
     try {
-      // In a real app, you would save the prescription to the database
-      // For this demo, we'll just show a success message
+      // Check if prescription already exists for this appointment
+      const prescriptionsRef = ref(database, 'prescriptions')
+      const snapshot = await get(prescriptionsRef)
+      
+      let prescriptionId = null
+      if (snapshot.exists()) {
+        const prescriptions = snapshot.val()
+        const existingPrescription = Object.entries(prescriptions).find(
+          ([_, prescription]: [string, any]) => prescription.appointmentId === appointment.id
+        )
+        if (existingPrescription) {
+          prescriptionId = existingPrescription[0] // Get the existing prescription ID
+        }
+      }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+      const prescriptionData = {
+        id: prescriptionId || push(prescriptionsRef).key,
+        appointmentId: appointment.id,
+        patientId: appointment.patientId,
+        date: new Date().toISOString(),
+        doctorId: appointment.doctorId,
+        doctorName: appointment.doctorName,
+        medicines: medicines.map(medicine => ({
+          name: medicine.name,
+          dosage: medicine.dosage,
+          frequency: medicine.frequency,
+          duration: medicine.duration,
+          notes: medicine.notes || ''
+        })),
+        instructions,
+        followUp
+      }
+
+      // If prescription exists, update it; otherwise create new
+      const prescriptionRef = ref(database, `prescriptions/${prescriptionId || prescriptionData.id}`)
+      await set(prescriptionRef, prescriptionData)
+
+      // Update appointment status to completed
+      const appointmentRef = ref(database, `appointments/${appointment.id}`)
+      await set(appointmentRef, {
+        ...appointment,
+        status: 'completed'
+      })
+
+      // Update doctor's total patients count
+      const doctorRef = ref(database, `doctors/${appointment.doctorId}`)
+      const doctorSnapshot = await get(doctorRef)
+      
+      if (doctorSnapshot.exists()) {
+        const doctorData = doctorSnapshot.val()
+        const currentTotalPatients = doctorData.totalPatients || 0
+        
+        // Get all appointments for this doctor
+        const appointmentsRef = ref(database, 'appointments')
+        const appointmentsSnapshot = await get(appointmentsRef)
+        
+        if (appointmentsSnapshot.exists()) {
+          const appointments = appointmentsSnapshot.val()
+          // Count unique patients with completed appointments for this doctor
+          const uniquePatients = new Set()
+          
+          Object.values(appointments).forEach((app: any) => {
+            if (app.doctorId === appointment.doctorId && app.status === 'completed') {
+              uniquePatients.add(app.patientId)
+            }
+          })
+          
+          // Update doctor's total patients count
+          await set(doctorRef, {
+            ...doctorData,
+            totalPatients: uniquePatients.size
+          })
+        }
+      }
 
       toast({
         title: "Prescription Saved",
-        description: "Prescription has been saved successfully.",
+        description: prescriptionId ? "Prescription has been updated successfully." : "Prescription has been saved successfully.",
       })
     } catch (error) {
       console.error("Error saving prescription:", error)
@@ -280,13 +364,13 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
               )}
             </Button>
 
-            <Dialog>
-              <DialogTrigger asChild>
+            <Dialog >
+              <DialogTrigger asChild >
                 <Button variant="outline" size="sm">
                   Templates
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="text-black">
                 <DialogHeader>
                   <DialogTitle>Prescription Templates</DialogTitle>
                   <DialogDescription>Select a template to quickly fill the prescription.</DialogDescription>
@@ -298,7 +382,9 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
                       variant="outline"
                       className="justify-start"
                       onClick={() => {
+
                         applyTemplate(template.name)
+                        setOpen(false);
                         document.querySelector('[data-state="open"]')?.setAttribute("data-state", "closed")
                       }}
                     >
@@ -357,13 +443,13 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
             <div className="text-center py-4 text-gray-500 border rounded-md">No medicines added yet</div>
           )}
 
-          <Dialog>
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="mt-4 bg-doctor hover:bg-green-700">
                 <Plus className="mr-2 h-4 w-4" /> Add Medicine
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="text-black">
               <DialogHeader>
                 <DialogTitle>Add Medicine</DialogTitle>
                 <DialogDescription>Add a new medicine to the prescription.</DialogDescription>
@@ -477,7 +563,11 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
         <Button variant="outline">
           <Download className="mr-2 h-4 w-4" /> Export PDF
         </Button>
-        <Button onClick={handleSavePrescription} disabled={isLoading} className="bg-doctor hover:bg-green-700">
+        <Button 
+          onClick={handleSavePrescription} 
+          disabled={isLoading || !medicines.length} 
+          className="bg-doctor hover:bg-green-700"
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

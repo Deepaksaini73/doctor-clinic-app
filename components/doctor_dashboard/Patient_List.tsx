@@ -19,10 +19,27 @@ export default function PatientList({
   isLoading,
   onSelectAppointment,
 }: EnhancedPatientListProps) {
-  const [activeTab, setActiveTab] = useState("upcoming")
+  const [searchQuery, setSearchQuery] = useState("")
 
-  const upcomingAppointments = appointments.filter((app) => app.status === "scheduled")
-  const completedAppointments = appointments.filter((app) => app.status === "completed")
+  // Search filter function
+  const filterAppointments = (appointments: Appointment[]) => {
+    return appointments.filter((appointment) => {
+      const searchTerm = searchQuery.toLowerCase()
+      return (
+        appointment.patientName.toLowerCase().includes(searchTerm) ||
+        appointment.symptoms.some(symptom => 
+          symptom.toLowerCase().includes(searchTerm)
+        ) ||
+        appointment.time.toLowerCase().includes(searchTerm)
+      )
+    })
+  }
+
+  // Filter appointments by search and organize by priority
+  const filteredAppointments = filterAppointments(appointments)
+  const emergencyAppointments = filteredAppointments.filter(app => app.priority === "emergency" && app.status === "scheduled")
+  const urgentAppointments = filteredAppointments.filter(app => app.priority === "urgent" && app.status === "scheduled")
+  const routineAppointments = filteredAppointments.filter(app => app.priority === "routine" && app.status === "scheduled")
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -48,6 +65,47 @@ export default function PatientList({
     }
   }
 
+  const renderAppointmentList = (appointments: Appointment[], title: string) => {
+    if (appointments.length === 0) return null
+
+    return (
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3 text-gray-900">{title}</h3>
+        <div className="space-y-2">
+          {appointments.map((appointment) => (
+            <div
+              key={appointment.id}
+              className={`border rounded-lg p-4 cursor-pointer hover:bg-gray-50 ${
+                selectedAppointment?.id === appointment.id ? "border-blue-600 border-l-4 bg-blue-50" : "border-gray-200"
+              }`}
+              onClick={() => onSelectAppointment(appointment)}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                  <span className="text-gray-600 font-medium text-sm">{appointment.patientName.charAt(0)}</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900">
+                    {appointment.patientName}{" "}
+                    <span className="text-sm text-gray-500">({appointment.patientAge}y)</span>
+                  </h3>
+                  <p className="text-sm text-gray-600">{appointment.symptoms.join(", ")}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-medium">{appointment.time}</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {getStatusBadge(appointment.status)}
+                {getPriorityBadge(appointment.priority)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -61,6 +119,8 @@ export default function PatientList({
           <input
             type="text"
             placeholder="Search patients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -75,70 +135,24 @@ export default function PatientList({
           </div>
         </div>
 
-        <div className="flex border-b mb-4">
-          <button
-            className={`px-4 py-2 font-medium text-sm ${activeTab === "upcoming" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
-            onClick={() => setActiveTab("upcoming")}
-          >
-            Upcoming
-          </button>
-          <button
-            className={`px-4 py-2 font-medium text-sm ${activeTab === "completed" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
-            onClick={() => setActiveTab("completed")}
-          >
-            Completed
-          </button>
-          <button
-            className={`px-4 py-2 font-medium text-sm ${activeTab === "all" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
-            onClick={() => setActiveTab("all")}
-          >
-            All
-          </button>
-        </div>
-
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {(activeTab === "upcoming"
-              ? upcomingAppointments
-              : activeTab === "completed"
-                ? completedAppointments
-                : appointments
-            ).map((appointment) => (
-              <div
-                key={appointment.id}
-                className={`border rounded-lg p-4 cursor-pointer hover:bg-gray-50 ${
-                  selectedAppointment?.id === appointment.id ? "border-blue-600 border-l-4 bg-blue-50" : "border-gray-200"
-                }`}
-                onClick={() => onSelectAppointment(appointment)}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                    <span className="text-gray-600 font-medium text-sm">{appointment.patientName.charAt(0)}</span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900">
-                      {appointment.patientName}{" "}
-                      <span className="text-sm text-gray-500">({appointment.patientAge}y)</span>
-                    </h3>
-                    <p className="text-sm text-gray-600">{appointment.symptoms.join(", ")}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-medium">{appointment.time}</span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {getStatusBadge(appointment.status)}
-                  {getPriorityBadge(appointment.priority)}
-                </div>
+          <div className="space-y-4 max-h-[600px] overflow-y-auto">
+            {renderAppointmentList(emergencyAppointments, "Emergency Cases")}
+            {renderAppointmentList(urgentAppointments, "Urgent Cases")}
+            {renderAppointmentList(routineAppointments, "Routine Cases")}
+            
+            {filteredAppointments.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No appointments found
               </div>
-            ))}
+            )}
           </div>
         )}
       </CardContent>
     </Card>
   )
-} 
+}

@@ -9,6 +9,49 @@ import type { Appointment, Doctor } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
 import { Download, BarChart, PieChart, LineChart } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { database } from "@/lib/firebase"
+import { ref, onValue, get } from "firebase/database"
+import {
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  LineChart as RechartsLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  BarChart as RechartsBarChart,
+  Bar
+} from 'recharts'
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
+
+// Custom label component for better positioning
+const CustomLabel = ({ cx, cy, midAngle, outerRadius, percent, name, fill }: any) => {
+  const RADIAN = Math.PI / 180
+  const sin = Math.sin(-midAngle * RADIAN)
+  const cos = Math.cos(-midAngle * RADIAN)
+  const sx = cx + (outerRadius + 4) * cos
+  const sy = cy + (outerRadius + 4) * sin
+  const mx = cx + (outerRadius + 15) * cos
+  const my = cy + (outerRadius + 15) * sin
+  const ex = mx + (cos >= 0 ? 1 : -1) * 8
+  const ey = my
+  const textAnchor = cos >= 0 ? 'start' : 'end'
+
+  return (
+    <g>
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
+      <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
+      <text x={ex + (cos >= 0 ? 1 : -1) * 2} y={ey} textAnchor={textAnchor} fill="#000000" dominantBaseline="central">
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    </g>
+  )
+}
 
 export default function AnalyticsDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -20,17 +63,27 @@ export default function AnalyticsDashboard() {
     const fetchData = async () => {
       setIsLoading(true)
       try {
-        // Fetch appointments
-        const appointmentsResponse = await fetch("/api/appointments")
-        if (!appointmentsResponse.ok) throw new Error("Failed to fetch appointments")
-        const appointmentsData = await appointmentsResponse.json()
-        setAppointments(appointmentsData)
+        // Fetch appointments from Firebase
+        const appointmentsRef = ref(database, 'appointments')
+        onValue(appointmentsRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const appointmentsData = Object.values(snapshot.val()) as Appointment[]
+            setAppointments(appointmentsData)
+          } else {
+            setAppointments([])
+          }
+        })
 
-        // Fetch doctors
-        const doctorsResponse = await fetch("/api/doctors")
-        if (!doctorsResponse.ok) throw new Error("Failed to fetch doctors")
-        const doctorsData = await doctorsResponse.json()
-        setDoctors(doctorsData)
+        // Fetch doctors from Firebase
+        const doctorsRef = ref(database, 'doctors')
+        onValue(doctorsRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const doctorsData = Object.values(snapshot.val()) as Doctor[]
+            setDoctors(doctorsData)
+          } else {
+            setDoctors([])
+          }
+        })
       } catch (error) {
         console.error("Error fetching data:", error)
         toast({
@@ -67,16 +120,34 @@ export default function AnalyticsDashboard() {
     count: appointments.filter((app) => app.doctorId === doctor.id).length,
   }))
 
-  // Mock time distribution data
-  const timeDistribution = [
-    { hour: "9:00 AM", count: 3 },
-    { hour: "10:00 AM", count: 5 },
-    { hour: "11:00 AM", count: 7 },
-    { hour: "12:00 PM", count: 2 },
-    { hour: "1:00 PM", count: 1 },
-    { hour: "2:00 PM", count: 4 },
-    { hour: "3:00 PM", count: 6 },
-    { hour: "4:00 PM", count: 3 },
+  // Calculate time distribution from actual data
+  const timeDistribution = appointments.reduce((acc: { [key: string]: number }, app) => {
+    const hour = app.time.split(':')[0] // Extract just the hour part
+    acc[hour] = (acc[hour] || 0) + 1
+    return acc
+  }, {})
+
+  // Create array with all hours (0-23) and initialize with 0 if no appointments
+  const timeDistributionArray = Array.from({ length: 24 }, (_, i) => {
+    const hour = i.toString().padStart(2, '0')
+    return {
+      hour: `${hour}:00`,
+      count: timeDistribution[hour] || 0
+    }
+  })
+
+  // Prepare data for charts
+  const statusData = [
+    { name: 'Scheduled', value: appointmentsByStatus.scheduled },
+    { name: 'In Progress', value: appointmentsByStatus.inProgress },
+    { name: 'Completed', value: appointmentsByStatus.completed },
+    { name: 'Cancelled', value: appointmentsByStatus.cancelled },
+  ]
+
+  const priorityData = [
+    { name: 'Routine', value: appointmentsByPriority.routine },
+    { name: 'Urgent', value: appointmentsByPriority.urgent },
+    { name: 'Emergency', value: appointmentsByPriority.emergency },
   ]
 
   return (
@@ -124,60 +195,86 @@ export default function AnalyticsDashboard() {
           <CardHeader>
             <CardTitle>Appointments by Status</CardTitle>
           </CardHeader>
-          <CardContent className="h-[300px] flex items-center justify-center">
-            <div className="text-center">
-              <PieChart className="h-32 w-32 mx-auto text-gray-300" />
-              <p className="mt-4 text-sm text-gray-500">Chart visualization would appear here</p>
-            </div>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsPieChart>
+                <Pie
+                  data={statusData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={true}
+                  label={CustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value: number) => [`${value} appointments`, 'Count']}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    padding: '8px'
+                  }}
+                />
+                <Legend 
+                  layout="horizontal" 
+                  verticalAlign="bottom" 
+                  align="center"
+                  wrapperStyle={{
+                    paddingTop: '20px'
+                  }}
+                />
+              </RechartsPieChart>
+            </ResponsiveContainer>
           </CardContent>
-          <CardFooter>
-            <div className="w-full grid grid-cols-4 gap-2 text-center text-sm">
-              <div>
-                <div className="font-medium">{appointmentsByStatus.scheduled}</div>
-                <div className="text-gray-500">Scheduled</div>
-              </div>
-              <div>
-                <div className="font-medium">{appointmentsByStatus.inProgress}</div>
-                <div className="text-gray-500">In Progress</div>
-              </div>
-              <div>
-                <div className="font-medium">{appointmentsByStatus.completed}</div>
-                <div className="text-gray-500">Completed</div>
-              </div>
-              <div>
-                <div className="font-medium">{appointmentsByStatus.cancelled}</div>
-                <div className="text-gray-500">Cancelled</div>
-              </div>
-            </div>
-          </CardFooter>
         </Card>
 
         <Card className="border-admin border-t-4">
           <CardHeader>
             <CardTitle>Appointments by Priority</CardTitle>
           </CardHeader>
-          <CardContent className="h-[300px] flex items-center justify-center">
-            <div className="text-center">
-              <PieChart className="h-32 w-32 mx-auto text-gray-300" />
-              <p className="mt-4 text-sm text-gray-500">Chart visualization would appear here</p>
-            </div>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsPieChart>
+                <Pie
+                  data={priorityData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={true}
+                  label={CustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {priorityData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value: number) => [`${value} appointments`, 'Count']}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    padding: '8px'
+                  }}
+                />
+                <Legend 
+                  layout="horizontal" 
+                  verticalAlign="bottom" 
+                  align="center"
+                  wrapperStyle={{
+                    paddingTop: '20px'
+                  }}
+                />
+              </RechartsPieChart>
+            </ResponsiveContainer>
           </CardContent>
-          <CardFooter>
-            <div className="w-full grid grid-cols-3 gap-2 text-center text-sm">
-              <div>
-                <div className="font-medium">{appointmentsByPriority.routine}</div>
-                <div className="text-gray-500">Routine</div>
-              </div>
-              <div>
-                <div className="font-medium">{appointmentsByPriority.urgent}</div>
-                <div className="text-gray-500">Urgent</div>
-              </div>
-              <div>
-                <div className="font-medium">{appointmentsByPriority.emergency}</div>
-                <div className="text-gray-500">Emergency</div>
-              </div>
-            </div>
-          </CardFooter>
         </Card>
       </div>
 
@@ -191,11 +288,23 @@ export default function AnalyticsDashboard() {
           </div>
           <CardDescription>Appointment distribution throughout the day</CardDescription>
         </CardHeader>
-        <CardContent className="h-[300px] flex items-center justify-center">
-          <div className="text-center">
-            <LineChart className="h-32 w-32 mx-auto text-gray-300" />
-            <p className="mt-4 text-sm text-gray-500">Chart visualization would appear here</p>
-          </div>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsLineChart data={timeDistributionArray}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="hour" 
+                tickFormatter={(hour) => hour.split(':')[0] + 'h'} // Format as "Xh"
+              />
+              <YAxis />
+              <Tooltip 
+                formatter={(value: number) => [`${value} appointments`, 'Count']}
+                labelFormatter={(hour) => `${hour.split(':')[0]}:00`}
+              />
+              <Legend />
+              <Line type="monotone" dataKey="count" stroke="#8884d8" activeDot={{ r: 8 }} />
+            </RechartsLineChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
 
@@ -209,22 +318,18 @@ export default function AnalyticsDashboard() {
           </div>
           <CardDescription>Appointments per doctor</CardDescription>
         </CardHeader>
-        <CardContent className="h-[300px] flex items-center justify-center">
-          <div className="text-center">
-            <BarChart className="h-32 w-32 mx-auto text-gray-300" />
-            <p className="mt-4 text-sm text-gray-500">Chart visualization would appear here</p>
-          </div>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsBarChart data={appointmentsByDoctor}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="doctorName" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="count" fill="#8884d8" />
+            </RechartsBarChart>
+          </ResponsiveContainer>
         </CardContent>
-        <CardFooter>
-          <div className="w-full grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-            {appointmentsByDoctor.map((item, index) => (
-              <div key={index} className="flex justify-between items-center">
-                <div className="truncate">{item.doctorName}</div>
-                <div className="font-medium">{item.count}</div>
-              </div>
-            ))}
-          </div>
-        </CardFooter>
       </Card>
     </div>
   )
@@ -248,25 +353,25 @@ function StatCard({
       case "admin":
         return "border-admin border-t-4"
       case "blue":
-        return "border-blue-500 border-t-4"
+        return "border-blue-600 border-t-4"
       case "green":
-        return "border-green-500 border-t-4"
+        return "border-green-600 border-t-4"
       case "red":
-        return "border-red-500 border-t-4"
+        return "border-red-600 border-t-4"
       default:
-        return "border-gray-500 border-t-4"
+        return "border-gray-600 border-t-4"
     }
   }
 
   return (
     <Card className={getBorderClass()}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {icon}
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-xs text-gray-500">{description}</p>
       </CardContent>
     </Card>
   )

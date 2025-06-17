@@ -14,7 +14,7 @@ interface EnhancedAppointmentsListProps {
   onAppointmentUpdated?: () => void
 }
 
-export default function EnhancedAppointmentsList({ onAppointmentUpdated }: EnhancedAppointmentsListProps) {
+export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppointmentsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
