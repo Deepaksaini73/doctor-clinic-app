@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Medicine, Appointment } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import { Loader2, Plus, Trash2, Save, Download, Sparkles, Check } from "lucide-react"
+import { Loader2, Plus, Trash2, Save, Download, Sparkles, Check, Pencil } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -25,25 +25,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ref, push, set, get } from "firebase/database"
 import { database } from "@/lib/firebase"
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 interface PrescriptionEditorProps {
   appointment: Appointment | null
-  symptoms?: string[] // Make symptoms optional
+  symptoms?: string[]
+  onClose?: () => void
+  isEditing?: boolean
+  initialPrescription?: {
+    diagnosis: string
+    medicines: Medicine[]
+    instructions: string
+    followUp: string
+  }
 }
 
 export default function PrescriptionEditor({ 
   appointment, 
-  symptoms = [] ,
-  onClose // Provide default empty array
+  symptoms = [],
+  onClose,
+  isEditing = false,
+  initialPrescription
 }: PrescriptionEditorProps) {
-  const [medicines, setMedicines] = useState<Medicine[]>([])
-  const [instructions, setInstructions] = useState("")
-  const [followUp, setFollowUp] = useState("No follow-up needed")
+  const [medicines, setMedicines] = useState<Medicine[]>(initialPrescription?.medicines || [])
+  const [instructions, setInstructions] = useState(initialPrescription?.instructions || "")
+  const [followUp, setFollowUp] = useState(initialPrescription?.followUp || "No follow-up needed")
+  const [diagnosis, setDiagnosis] = useState(initialPrescription?.diagnosis || "")
   const [isLoading, setIsLoading] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [medicineSearchResults, setMedicineSearchResults] = useState<Medicine[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
@@ -56,6 +69,9 @@ export default function PrescriptionEditor({
     duration: "",
     notes: "",
   })
+
+  const [editingMedicineIndex, setEditingMedicineIndex] = useState<number | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
   useEffect(() => {
     if (appointment) {
@@ -99,17 +115,19 @@ export default function PrescriptionEditor({
       const data = await response.json();
       console.log("Received data from API:", data);
 
-      if (!Array.isArray(data)) {
+      if (!data.diagnosis || !Array.isArray(data.medicines)) {
         throw new Error("Invalid response format from API");
       }
 
-      setMedicines(data);
+      // Update both diagnosis and medicines
+      setDiagnosis(data.diagnosis);
+      setMedicines(data.medicines);
       setInstructions("");
       setFollowUp("");
 
       toast({
         title: "AI Suggestions Generated",
-        description: "Prescription suggestions have been generated based on symptoms.",
+        description: "Diagnosis and prescription suggestions have been generated based on symptoms.",
       });
     } catch (error) {
       console.error("Error getting AI suggestions:", error);
@@ -185,6 +203,15 @@ export default function PrescriptionEditor({
       return
     }
 
+    if (!diagnosis.trim()) {
+      toast({
+        title: "Error",
+        description: "Please add a diagnosis",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -199,7 +226,7 @@ export default function PrescriptionEditor({
           ([_, prescription]: [string, any]) => prescription.appointmentId === appointment.id
         )
         if (existingPrescription) {
-          prescriptionId = existingPrescription[0] // Get the existing prescription ID
+          prescriptionId = existingPrescription[0]
         }
       }
 
@@ -210,6 +237,7 @@ export default function PrescriptionEditor({
         date: new Date().toISOString(),
         doctorId: appointment.doctorId,
         doctorName: appointment.doctorName,
+        diagnosis: diagnosis,
         medicines: medicines.map(medicine => ({
           name: medicine.name,
           dosage: medicine.dosage,
@@ -377,6 +405,137 @@ const handleSearchMedicine = async (query: string) => {
     }
   }
 
+  const handleEditMedicine = (index: number) => {
+    setNewMedicine(medicines[index])
+    setEditingMedicineIndex(index)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateMedicine = () => {
+    if (editingMedicineIndex === null) return
+
+    if (!newMedicine.name || !newMedicine.dosage || !newMedicine.frequency || !newMedicine.duration) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const updatedMedicines = [...medicines]
+      updatedMedicines[editingMedicineIndex] = { ...newMedicine }
+      setMedicines(updatedMedicines)
+
+      // Reset form and state
+      setNewMedicine({
+        name: "",
+        dosage: "",
+        frequency: "",
+        duration: "",
+        notes: "",
+      })
+      setEditingMedicineIndex(null)
+      setIsEditDialogOpen(false)
+
+      toast({
+        title: "Success",
+        description: "Medicine updated successfully",
+      })
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update medicine"
+      })
+    }
+  }
+
+  const handleExportPDF = () => {
+    if (!appointment) return
+
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    
+    // Add header
+    doc.setFontSize(20)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Medical Prescription', pageWidth / 2, 20, { align: 'center' })
+    
+    // Add patient info
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Patient Name: ${appointment.patientName}`, 20, 40)
+    doc.text(`Age: ${appointment.patientAge} years`, 20, 50)
+    doc.text(`Gender: ${appointment.gender}`, 20, 60)
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 70)
+    
+    // Add diagnosis
+    doc.setFont('helvetica', 'bold')
+    doc.text('Diagnosis:', 20, 90)
+    doc.setFont('helvetica', 'normal')
+    const diagnosisLines = doc.splitTextToSize(diagnosis, pageWidth - 40)
+    doc.text(diagnosisLines, 20, 100)
+    
+    // Add medicines table
+    doc.setFont('helvetica', 'bold')
+    doc.text('Prescribed Medicines:', 20, 120)
+    
+    const tableData = medicines.map(med => [
+      med.name,
+      med.dosage,
+      med.frequency,
+      med.duration,
+      med.notes || ''
+    ])
+    
+    autoTable(doc, {
+      startY: 130,
+      head: [['Medicine', 'Dosage', 'Frequency', 'Duration', 'Notes']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      styles: { fontSize: 10 },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 40 }
+      }
+    })
+    
+    // Add instructions
+    const finalY = (doc as any).lastAutoTable.finalY + 10
+    doc.setFont('helvetica', 'bold')
+    doc.text('Instructions:', 20, finalY)
+    doc.setFont('helvetica', 'normal')
+    const instructionLines = doc.splitTextToSize(instructions, pageWidth - 40)
+    doc.text(instructionLines, 20, finalY + 10)
+    
+    // Add follow-up
+    const followUpY = finalY + 20 + (instructionLines.length * 7)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Follow-up:', 20, followUpY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(followUp, 20, followUpY + 10)
+    
+    // Add doctor info
+    doc.setFont('helvetica', 'bold')
+    doc.text('Doctor:', 20, followUpY + 30)
+    doc.setFont('helvetica', 'normal')
+    doc.text(appointment.doctorName, 20, followUpY + 40)
+    
+    // Save the PDF
+    doc.save(`prescription_${appointment.patientName}_${new Date().toISOString().split('T')[0]}.pdf`)
+    
+    toast({
+      title: "PDF Exported",
+      description: "Prescription has been exported successfully.",
+    })
+  }
+
   if (!appointment) {
     return (
       <Card className="h-full flex items-center justify-center border-doctor border-t-4">
@@ -388,19 +547,22 @@ const handleSearchMedicine = async (query: string) => {
   }
 
   return (
-    <Card className="h-full border-doctor border-t-4">
-      <CardHeader>
+    <Card className="h-full border-doctor border-t-4 shadow-sm">
+      <CardHeader className="bg-gray-50 border-b">
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Prescription</CardTitle>
-            <CardDescription>Create a prescription for {appointment.patientName}</CardDescription>
+            <CardTitle className="text-2xl font-semibold text-gray-900">{isEditing ? 'Edit Prescription' : 'Create Prescription'}</CardTitle>
+            <CardDescription className="mt-1 text-gray-600">
+              {isEditing ? 'Edit prescription for' : 'Create a prescription for'} {appointment?.patientName}
+            </CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={handleGetAISuggestions}
               disabled={isSuggesting || !(symptoms?.length > 0)}
+              className="border-blue-200 hover:bg-blue-50 hover:text-blue-700"
             >
               {isSuggesting ? (
                 <>
@@ -415,27 +577,26 @@ const handleSearchMedicine = async (query: string) => {
               )}
             </Button>
 
-            <Dialog >
-              <DialogTrigger asChild >
-                <Button variant="outline" size="sm">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="border-green-200 hover:bg-green-50 hover:text-green-700">
                   Templates
                 </Button>
               </DialogTrigger>
               <DialogContent className="text-black">
                 <DialogHeader>
-                  <DialogTitle>Prescription Templates</DialogTitle>
-                  <DialogDescription>Select a template to quickly fill the prescription.</DialogDescription>
+                  <DialogTitle className="text-xl font-semibold">Prescription Templates</DialogTitle>
+                  <DialogDescription className="text-gray-600">Select a template to quickly fill the prescription.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-3 py-4">
                   {prescriptionTemplates.map((template) => (
                     <Button
                       key={template.name}
                       variant="outline"
-                      className="justify-start"
+                      className="justify-start hover:bg-gray-50"
                       onClick={() => {
-
                         applyTemplate(template.name)
-                        setOpen(false);
+                        setOpen(false)
                         document.querySelector('[data-state="open"]')?.setAttribute("data-state", "closed")
                       }}
                     >
@@ -448,42 +609,158 @@ const handleSearchMedicine = async (query: string) => {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* <Alert className="bg-blue-50 border-blue-200">
-          <AlertDescription className="text-blue-800">
-            <strong>ML Integration Point:</strong> The AI Suggest button will be connected to your ML prescription
-            recommendation engine.
-          </AlertDescription>
-        </Alert> */}
+      <CardContent className="space-y-6 pt-6">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Diagnosis</h3>
+          <Textarea
+            value={diagnosis}
+            onChange={(e) => setDiagnosis(e.target.value)}
+            placeholder="Enter the diagnosis"
+            className="min-h-[100px] resize-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
         <div>
-          <h3 className="font-medium mb-2">Medicines</h3>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">Medicines</h3>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-doctor hover:bg-green-700 text-sm">
+                  <Plus className="mr-2 h-4 w-4" /> Add Medicine
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="text-black">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-semibold">Add Medicine</DialogTitle>
+                  <DialogDescription className="text-gray-600">Add a new medicine to the prescription.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="relative">
+                    <Label htmlFor="medicine-search" className="text-sm font-medium text-gray-700">Search Medicine</Label>
+                    <Input
+                      id="medicine-search"
+                      placeholder="Type to search medicines..."
+                      value={searchQuery}
+                      onChange={(e) => handleSearchMedicine(e.target.value)}
+                      className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                    />
+                    {medicineSearchResults.length > 0 && (
+                      <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-auto mt-1">
+                        {medicineSearchResults.map((medicine, index) => (
+                          <div
+                            key={index}
+                            className="p-2 hover:bg-gray-50 cursor-pointer text-sm"
+                            onClick={() => handleSelectMedicine(medicine)}
+                          >
+                            {medicine.name} - {medicine.dosage}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="medicine-name" className="text-sm font-medium text-gray-700">Name</Label>
+                      <Input
+                        id="medicine-name"
+                        value={newMedicine.name}
+                        onChange={(e) => setNewMedicine({ ...newMedicine, name: e.target.value })}
+                        className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="medicine-dosage" className="text-sm font-medium text-gray-700">Dosage</Label>
+                      <Input
+                        id="medicine-dosage"
+                        value={newMedicine.dosage}
+                        onChange={(e) => setNewMedicine({ ...newMedicine, dosage: e.target.value })}
+                        className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="medicine-frequency" className="text-sm font-medium text-gray-700">Frequency</Label>
+                      <Input
+                        id="medicine-frequency"
+                        value={newMedicine.frequency}
+                        onChange={(e) => setNewMedicine({ ...newMedicine, frequency: e.target.value })}
+                        className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="medicine-duration" className="text-sm font-medium text-gray-700">Duration</Label>
+                      <Input
+                        id="medicine-duration"
+                        value={newMedicine.duration}
+                        onChange={(e) => setNewMedicine({ ...newMedicine, duration: e.target.value })}
+                        className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="medicine-notes" className="text-sm font-medium text-gray-700">Notes (Optional)</Label>
+                    <Input
+                      id="medicine-notes"
+                      value={newMedicine.notes}
+                      onChange={(e) => setNewMedicine({ ...newMedicine, notes: e.target.value })}
+                      className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button 
+                    type="button"
+                    onClick={handleAddMedicine} 
+                    className="bg-doctor hover:bg-green-700"
+                  >
+                    Add Medicine
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
 
           {medicines.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border rounded-lg">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Medicine</TableHead>
-                    <TableHead>Dosage</TableHead>
-                    <TableHead>Frequency</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700">Medicine</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Dosage</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Frequency</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Duration</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Notes</TableHead>
+                    <TableHead className="w-[100px] font-semibold text-gray-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {medicines.map((medicine, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{medicine.name}</TableCell>
+                    <TableRow key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <TableCell className="font-medium">{medicine.name}</TableCell>
                       <TableCell>{medicine.dosage}</TableCell>
                       <TableCell>{medicine.frequency}</TableCell>
                       <TableCell>{medicine.duration}</TableCell>
-                      <TableCell>{medicine.notes}</TableCell>
+                      <TableCell className="text-gray-600">{medicine.notes}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => handleRemoveMedicine(index)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleEditMedicine(index)}
+                            className="hover:bg-blue-50 hover:text-blue-700"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleRemoveMedicine(index)}
+                            className="hover:bg-red-50 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -491,116 +768,30 @@ const handleSearchMedicine = async (query: string) => {
               </Table>
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500 border rounded-md">No medicines added yet</div>
-          )}
-
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="mt-4 bg-doctor hover:bg-green-700">
-                <Plus className="mr-2 h-4 w-4" /> Add Medicine
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="text-black">
-              <DialogHeader>
-                <DialogTitle>Add Medicine</DialogTitle>
-                <DialogDescription>Add a new medicine to the prescription.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="relative">
-                  <Label htmlFor="medicine-search">Search Medicine</Label>
-                  <Input
-                    id="medicine-search"
-                    placeholder="Type to search medicines..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearchMedicine(e.target.value)}
-                    className="mb-2"
-                  />
-                  {medicineSearchResults.length > 0 && (
-                    <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-                      {medicineSearchResults.map((medicine, index) => (
-                        <div
-                          key={index}
-                          className="p-2 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => handleSelectMedicine(medicine)}
-                        >
-                          {medicine.name} - {medicine.dosage}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="medicine-name">Name</Label>
-                    <Input
-                      id="medicine-name"
-                      value={newMedicine.name}
-                      onChange={(e) => setNewMedicine({ ...newMedicine, name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="medicine-dosage">Dosage</Label>
-                    <Input
-                      id="medicine-dosage"
-                      value={newMedicine.dosage}
-                      onChange={(e) => setNewMedicine({ ...newMedicine, dosage: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="medicine-frequency">Frequency</Label>
-                    <Input
-                      id="medicine-frequency"
-                      value={newMedicine.frequency}
-                      onChange={(e) => setNewMedicine({ ...newMedicine, frequency: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="medicine-duration">Duration</Label>
-                    <Input
-                      id="medicine-duration"
-                      value={newMedicine.duration}
-                      onChange={(e) => setNewMedicine({ ...newMedicine, duration: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="medicine-notes">Notes (Optional)</Label>
-                  <Input
-                    id="medicine-notes"
-                    value={newMedicine.notes}
-                    onChange={(e) => setNewMedicine({ ...newMedicine, notes: e.target.value })}
-                  />
-                </div>
+            <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
+              <div className="flex flex-col items-center gap-2">
+                <Plus className="h-8 w-8 text-gray-400" />
+                <p>No medicines added yet</p>
+                <p className="text-sm text-gray-400">Click "Add Medicine" to start</p>
               </div>
-              <DialogFooter>
-                <Button 
-                  type="button"
-                  onClick={handleAddMedicine} 
-                  className="bg-doctor hover:bg-green-700"
-                >
-                  Add Medicine
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </div>
+          )}
         </div>
 
         <div>
-          <h3 className="font-medium mb-2">Instructions</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Instructions</h3>
           <Textarea
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
             placeholder="Enter instructions for the patient"
-            className="min-h-[100px]"
+            className="min-h-[100px] resize-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <div>
-          <h3 className="font-medium mb-2">Follow-up</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Follow-up</h3>
           <Select value={followUp} onValueChange={setFollowUp}>
-            <SelectTrigger>
+            <SelectTrigger className="focus:ring-2 focus:ring-blue-500">
               <SelectValue placeholder="Select follow-up period" />
             </SelectTrigger>
             <SelectContent>
@@ -614,13 +805,18 @@ const handleSearchMedicine = async (query: string) => {
           </Select>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline">
+      <CardFooter className="flex justify-between border-t bg-gray-50 px-6 py-4">
+        <Button 
+          variant="outline" 
+          className="border-gray-200 hover:bg-gray-100"
+          onClick={handleExportPDF}
+          disabled={!medicines.length || !diagnosis.trim()}
+        >
           <Download className="mr-2 h-4 w-4" /> Export PDF
         </Button>
         <Button 
           onClick={handleSavePrescription} 
-          disabled={isLoading || !medicines.length} 
+          disabled={isLoading || !medicines.length || !diagnosis.trim()} 
           className="bg-doctor hover:bg-green-700"
         >
           {isLoading ? (
@@ -630,7 +826,7 @@ const handleSearchMedicine = async (query: string) => {
             </>
           ) : (
             <>
-              <Save className="mr-2 h-4 w-4" /> Save Prescription
+              <Save className="mr-2 h-4 w-4" /> {isEditing ? 'Update' : 'Save'} Prescription
             </>
           )}
         </Button>

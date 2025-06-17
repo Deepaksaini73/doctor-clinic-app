@@ -14,18 +14,18 @@ import { Toaster } from "@/components/ui/toaster"
 
 const DEMO_CREDENTIALS = {
   admin: {
-    email: "admin@clinic.com",
-    password: "admin123",
+    email: "clinicare@gmail.com",
+    password: "clinicare@123",
     label: "Admin Demo Login",
   },
   doctor: {
-    email: "sarah@clinic.com",
-    password: "doctor123",
+    email: "dr.rnbijarniya@gmail.com",
+    password: "ramniwas@123",
     label: "Doctor Demo Login",
   },
   receptionist: {
-    email: "receptionist@clinic.com",
-    password: "password123",
+    email: "ankitajain@gmail.com",
+    password: "ankitajain@123",
     label: "Receptionist Demo Login",
   },
 }
