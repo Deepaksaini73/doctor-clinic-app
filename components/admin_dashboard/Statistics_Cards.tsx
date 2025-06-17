@@ -6,7 +6,7 @@ import { StatCard } from "@/components/ui/enhanced-card"
 import { StatCardSkeleton } from "@/components/ui/loading-skeleton"
 import { database } from "@/lib/firebase"
 import { ref, onValue } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export default function StatisticsCards() {
   const [isLoading, setIsLoading] = useState(true)

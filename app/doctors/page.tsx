@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import MainLayout from "@/components/layout/main-layout"
 import { ref, onValue, push, remove, DataSnapshot, get } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { Toaster } from "@/components/ui/toaster"
 
 interface Doctor {
   id: string
@@ -26,8 +27,6 @@ interface Doctor {
     days: string[]
     hours: string
   }
-  rating: number
-  totalPatients: number
   status: "active" | "inactive"
   joinDate: string
 }
@@ -115,8 +114,6 @@ export default function DoctorsPage() {
         days: newDoctor.availableDays,
         hours: newDoctor.availableHours,
       },
-      rating: 0,
-      totalPatients: 0,
       status: "active",
       joinDate: new Date().toISOString().split("T")[0],
     }
@@ -182,8 +179,6 @@ export default function DoctorsPage() {
   const stats = {
     totalDoctors: doctors.length,
     activeDoctors: doctors.filter((d) => d.status === "active").length,
-    avgRating: (doctors.reduce((sum, d) => sum + d.rating, 0) / doctors.length).toFixed(1),
-    totalPatients: doctors.reduce((sum, d) => sum + d.totalPatients, 0),
   }
 
   return (
@@ -214,34 +209,6 @@ export default function DoctorsPage() {
                   </div>
                   <p className="text-sm font-medium text-gray-600">Active Doctors</p>
                   <p className="text-xl md:text-2xl font-bold text-gray-900">{stats.activeDoctors}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-3 md:mb-4">
-                    <Star className="h-5 w-5 md:h-6 md:w-6 text-yellow-600" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-600">Avg Rating</p>
-                  <p className="text-xl md:text-2xl font-bold text-gray-900">{stats.avgRating}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-3 md:mb-4">
-                    <Clock className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-600">Total Patients</p>
-                  <p className="text-xl md:text-2xl font-bold text-gray-900">{stats.totalPatients}</p>
                 </div>
               </div>
             </CardContent>
@@ -423,8 +390,6 @@ export default function DoctorsPage() {
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Doctor</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Specialization</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Experience</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Rating</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Patients</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
                   </tr>
@@ -450,13 +415,6 @@ export default function DoctorsPage() {
                       </td>
                       <td className="py-3 px-4 text-sm">{doctor.specialization}</td>
                       <td className="py-3 px-4 text-sm">{doctor.experience} years</td>
-                      <td className="py-3 px-4 text-sm">
-                        <div className="flex items-center">
-                          <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                          {doctor.rating}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-sm">{doctor.totalPatients}</td>
                       <td className="py-3 px-4">
                         <Badge
                           className={
@@ -524,17 +482,6 @@ export default function DoctorsPage() {
                         <span className="ml-1 font-medium">{doctor.experience} years</span>
                       </div>
                       <div>
-                        <span className="text-gray-500">Rating:</span>
-                        <span className="ml-1 font-medium flex items-center">
-                          <Star className="h-3 w-3 text-yellow-400 mr-1" />
-                          {doctor.rating}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Patients:</span>
-                        <span className="ml-1 font-medium">{doctor.totalPatients}</span>
-                      </div>
-                      <div>
                         <span className="text-gray-500">Phone:</span>
                         <span className="ml-1 font-medium">{doctor.phone}</span>
                       </div>
@@ -570,5 +517,6 @@ export default function DoctorsPage() {
         </Card>
       </div>
     </MainLayout>
+
   )
 }

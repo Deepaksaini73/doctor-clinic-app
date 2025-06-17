@@ -6,8 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { Patient } from "@/lib/types"
 import { database } from "@/lib/firebase"
-import { ref, get } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { ref, get ,update } from "firebase/database"
+import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { X, Plus } from "lucide-react"
 
 interface Appointment {
   id: string
@@ -15,12 +18,12 @@ interface Appointment {
   patientName: string
   patientAge: number
   gender: string
-  contact: string
+  mobileNumber: string
   doctorId: string
   doctorName: string
   date: string
   time: string
-  symptoms: string[]
+  symptoms?: string[] // Make symptoms optional
   status: "scheduled" | "in-progress" | "completed" | "cancelled"
   priority: "routine" | "urgent" | "emergency"
   notes?: string
@@ -57,8 +60,69 @@ export default function PatientProfile({ appointment, patient }: EnhancedPatient
   const [showHistory, setShowHistory] = useState(false)
   const [pastVisits, setPastVisits] = useState<Visit[]>([])
   const [isLoadingVisits, setIsLoadingVisits] = useState(false)
+  const [newSymptom, setNewSymptom] = useState("")
+  const [isUpdatingSymptoms, setIsUpdatingSymptoms] = useState(false)
   const { toast } = useToast()
 
+
+
+  const handleAddSymptom = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newSymptom.trim() || !appointment) return
+
+    setIsUpdatingSymptoms(true)
+    try {
+      const currentSymptoms = appointment.symptoms || []
+      const updatedSymptoms = [...currentSymptoms, newSymptom.trim()]
+      
+      await update(ref(database, `appointments/${appointment.id}`), {
+        symptoms: updatedSymptoms
+      })
+      
+      appointment.symptoms = updatedSymptoms
+      setNewSymptom("")
+      toast({
+        title: "Symptom Added",
+        description: "The symptom has been added successfully."
+      })
+    } catch (error) {
+      console.error("Error adding symptom:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add symptom. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsUpdatingSymptoms(false)
+    }
+  }
+
+  const handleRemoveSymptom = async (indexToRemove: number) => {
+    if (!appointment?.symptoms) return
+    
+    setIsUpdatingSymptoms(true)
+    try {
+      const updatedSymptoms = appointment.symptoms.filter((_, index) => index !== indexToRemove)
+      await update(ref(database, `appointments/${appointment.id}`), {
+        symptoms: updatedSymptoms
+      })
+      
+      appointment.symptoms = updatedSymptoms
+      toast({
+        title: "Symptom Removed",
+        description: "The symptom has been removed successfully."
+      })
+    } catch (error) {
+      console.error("Error removing symptom:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove symptom. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsUpdatingSymptoms(false)
+    }
+  }
   const fetchPastVisits = async () => {
     if (!appointment.patientId) return
 
@@ -232,7 +296,7 @@ export default function PatientProfile({ appointment, patient }: EnhancedPatient
                 <span className="font-medium">Gender:</span> {appointment?.gender}
               </p>
               <p>
-                <span className="font-medium">Contact:</span> {appointment?.contact}
+                <span className="font-medium">Contact:</span> {appointment?.mobileNumber}
               </p>
               <p>
                 <span className="font-medium">Patient ID:</span> {appointment.patientId}
@@ -240,15 +304,53 @@ export default function PatientProfile({ appointment, patient }: EnhancedPatient
             </div>
 
             <div className="mt-4">
-              <h4 className="text-sm font-medium text-gray-500 mb-2">Current Symptoms</h4>
-              <div className="flex flex-wrap gap-2">
-                {appointment.symptoms.map((symptom, index) => (
-                  <Badge key={index} className="bg-blue-100 text-blue-800">
-                    {symptom}
-                  </Badge>
-                ))}
-              </div>
-            </div>
+    <h4 className="text-sm font-medium text-gray-500 mb-2">Current Symptoms</h4>
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {(appointment?.symptoms || []).map((symptom, index) => (
+          <Badge 
+            key={index} 
+            className="bg-blue-100 text-blue-800 flex items-center gap-1 pr-2"
+          >
+            {symptom}
+            <button
+              onClick={() => handleRemoveSymptom(index)}
+              className="ml-1 hover:text-red-600 focus:outline-none"
+              disabled={isUpdatingSymptoms}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
+      </div>
+      
+      <form onSubmit={handleAddSymptom} className="flex gap-2">
+        <Input
+          type="text"
+          value={newSymptom}
+          onChange={(e) => setNewSymptom(e.target.value)}
+          placeholder="Add new symptom..."
+          className="flex-1"
+          disabled={isUpdatingSymptoms}
+        />
+        <Button 
+          type="submit" 
+          size="sm"
+          disabled={!newSymptom.trim() || isUpdatingSymptoms}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Add
+        </Button>
+      </form>
+      
+      {isUpdatingSymptoms && (
+        <div className="text-sm text-blue-600">
+          Updating symptoms...
+        </div>
+      )}
+    </div>
+  </div>
 
             {patient?.medicalHistory?.allergies && patient.medicalHistory.allergies.length > 0 && (
               <div className="mt-4">

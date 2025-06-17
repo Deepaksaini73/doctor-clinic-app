@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select"
 import { database } from "@/lib/firebase"
 import { ref, onValue, push, set } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface Doctor {
   id: string

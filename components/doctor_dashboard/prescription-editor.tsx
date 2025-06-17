@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { Medicine, Appointment } from "@/lib/types"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import { Loader2, Plus, Trash2, Save, Download, Sparkles, Check } from "lucide-react"
 import {
   Dialog,
@@ -26,10 +28,14 @@ import { database } from "@/lib/firebase"
 
 interface PrescriptionEditorProps {
   appointment: Appointment | null
-  symptoms: string[]
+  symptoms?: string[] // Make symptoms optional
 }
 
-export default function PrescriptionEditor({ appointment, symptoms }: PrescriptionEditorProps) {
+export default function PrescriptionEditor({ 
+  appointment, 
+  symptoms = [] ,
+  onClose // Provide default empty array
+}: PrescriptionEditorProps) {
   const [medicines, setMedicines] = useState<Medicine[]>([])
   const [instructions, setInstructions] = useState("")
   const [followUp, setFollowUp] = useState("No follow-up needed")
@@ -39,6 +45,7 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
   const [searchQuery, setSearchQuery] = useState("")
   const [open, setOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false)
+  const router = useRouter()
   const { toast } = useToast()
 
   // New medicine form state
@@ -60,51 +67,63 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
   }, [appointment])
 
   const handleGetAISuggestions = async () => {
-    if (!symptoms.length) {
+    // Add null check and length validation
+    if (!symptoms?.length) {
       toast({
         title: "No symptoms",
-        description: "Please enter symptoms to get AI suggestions.",
-      })
-      return
+        description: "Please add symptoms to get AI suggestions.",
+      });
+      return;
     }
 
-    setIsSuggesting(true)
+    setIsSuggesting(true);
 
     try {
-      // This is where you would integrate with your ML prescription suggestion system
-      // For now, we'll use the mock API
-      const response = await fetch("/api/ai/suggest", {
+      console.log("Sending symptoms to API:", symptoms);
+      const response = await fetch("/api/medicines", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ symptoms }),
-      })
+        body: JSON.stringify({
+          symptoms: symptoms.map(s => s.trim())
+        }),
+      });
 
-      if (!response.ok) throw new Error("Failed to get AI suggestions")
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(errorData.error || "Failed to get AI suggestions");
+      }
 
-      const data = await response.json()
+      const data = await response.json();
+      console.log("Received data from API:", data);
 
-      setMedicines(data.medicines)
-      setInstructions(data.instructions)
-      setFollowUp(data.followUp || "No follow-up needed")
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid response format from API");
+      }
+
+      setMedicines(data);
+      setInstructions("");
+      setFollowUp("");
 
       toast({
         title: "AI Suggestions Generated",
         description: "Prescription suggestions have been generated based on symptoms.",
-      })
+      });
     } catch (error) {
-      console.error("Error getting AI suggestions:", error)
+      console.error("Error getting AI suggestions:", error);
       toast({
         title: "Error",
-        description: "Failed to get AI suggestions. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to get AI suggestions. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSuggesting(false)
+      setIsSuggesting(false);
     }
-  }
+  };
 
+  // Update handleAddMedicine function
   const handleAddMedicine = () => {
     if (!newMedicine.name || !newMedicine.dosage || !newMedicine.frequency || !newMedicine.duration) {
       toast({
@@ -115,16 +134,37 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
       return
     }
 
-    setMedicines([...medicines, { ...newMedicine }])
+    try {
+      // Add medicine to list
+      setMedicines(prev => [...prev, { ...newMedicine }])
 
-    // Reset form
-    setNewMedicine({
-      name: "",
-      dosage: "",
-      frequency: "",
-      duration: "",
-      notes: "",
-    })
+      // Reset form
+      setNewMedicine({
+        name: "",
+        dosage: "",
+        frequency: "",
+        duration: "",
+        notes: "",
+      })
+      
+      // Clear search
+      setSearchQuery("")
+      setMedicineSearchResults([])
+      
+      // Close dialog
+      setOpen(false)
+
+      toast({
+        title: "Success",
+        description: "Medicine added successfully",
+      })
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add medicine"
+      })
+    }
   }
 
   const handleRemoveMedicine = (index: number) => {
@@ -135,6 +175,15 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
 
   const handleSavePrescription = async () => {
     if (!appointment) return
+
+    if (!medicines.length) {
+      toast({
+        title: "Error",
+        description: "Please add at least one medicine",
+        variant: "destructive"
+      })
+      return
+    }
 
     setIsLoading(true)
 
@@ -183,10 +232,52 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
         status: 'completed'
       })
 
+      // Update doctor's total patients count
+      const doctorRef = ref(database, `doctors/${appointment.doctorId}`)
+      const doctorSnapshot = await get(doctorRef)
+      
+      if (doctorSnapshot.exists()) {
+        const doctorData = doctorSnapshot.val()
+        const currentTotalPatients = doctorData.totalPatients || 0
+        
+        // Get all appointments for this doctor
+        const appointmentsRef = ref(database, 'appointments')
+        const appointmentsSnapshot = await get(appointmentsRef)
+        
+        if (appointmentsSnapshot.exists()) {
+          const appointments = appointmentsSnapshot.val()
+          // Count unique patients with completed appointments for this doctor
+          const uniquePatients = new Set()
+          
+          Object.values(appointments).forEach((app: any) => {
+            if (app.doctorId === appointment.doctorId && app.status === 'completed') {
+              uniquePatients.add(app.patientId)
+            }
+          })
+          
+          // Update doctor's total patients count
+          await set(doctorRef, {
+            ...doctorData,
+            totalPatients: uniquePatients.size
+          })
+        }
+      }
+
       toast({
         title: "Prescription Saved",
         description: prescriptionId ? "Prescription has been updated successfully." : "Prescription has been saved successfully.",
       })
+      
+      // Reset states
+      setMedicines([])
+      setInstructions("")
+      setFollowUp("No follow-up needed")
+      setIsSaved(true)
+      if (onClose) {
+        onClose()
+      }
+      router.refresh()
+
     } catch (error) {
       console.error("Error saving prescription:", error)
       toast({
@@ -199,31 +290,32 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
     }
   }
 
-  const handleSearchMedicine = async (query: string) => {
-    setSearchQuery(query)
+const handleSearchMedicine = async (query: string) => {
+  setSearchQuery(query);
 
-    if (!query.trim()) {
-      setMedicineSearchResults([])
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/medicines?q=${encodeURIComponent(query)}`)
-
-      if (!response.ok) throw new Error("Failed to search medicines")
-
-      const data = await response.json()
-      setMedicineSearchResults(data)
-    } catch (error) {
-      console.error("Error searching medicines:", error)
-    }
+  if (!query.trim()) {
+    setMedicineSearchResults([]);
+    return;
   }
+
+  try {
+    const response = await fetch(`/api/medicines/searchmedicines?q=${encodeURIComponent(query)}`);
+    if (!response.ok) throw new Error("Failed to search medicines");
+    const data = await response.json();
+    setMedicineSearchResults(data);  // ✅ should be an array of objects { name, dosage }
+  } catch (error) {
+    console.error("Error searching medicines:", error);
+  }
+};
+
 
   const handleSelectMedicine = (medicine: Medicine) => {
     setNewMedicine({
       ...newMedicine,
       name: medicine.name,
       dosage: medicine.dosage,
+      frequency: medicine.frequency || "",
+      duration: medicine.duration || "",
     })
     setSearchQuery("")
     setMedicineSearchResults([])
@@ -308,7 +400,7 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
               variant="outline"
               size="sm"
               onClick={handleGetAISuggestions}
-              disabled={isSuggesting || !symptoms.length}
+              disabled={isSuggesting || !(symptoms?.length > 0)}
             >
               {isSuggesting ? (
                 <>
@@ -357,12 +449,12 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert className="bg-blue-50 border-blue-200">
+        {/* <Alert className="bg-blue-50 border-blue-200">
           <AlertDescription className="text-blue-800">
             <strong>ML Integration Point:</strong> The AI Suggest button will be connected to your ML prescription
             recommendation engine.
           </AlertDescription>
-        </Alert>
+        </Alert> */}
 
         <div>
           <h3 className="font-medium mb-2">Medicines</h3>
@@ -483,7 +575,11 @@ export default function PrescriptionEditor({ appointment, symptoms }: Prescripti
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleAddMedicine} className="bg-doctor hover:bg-green-700">
+                <Button 
+                  type="button"
+                  onClick={handleAddMedicine} 
+                  className="bg-doctor hover:bg-green-700"
+                >
                   Add Medicine
                 </Button>
               </DialogFooter>

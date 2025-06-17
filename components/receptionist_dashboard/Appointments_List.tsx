@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { database } from "@/lib/firebase"
 import { ref, onValue, remove, update } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface EnhancedAppointmentsListProps {
   onAppointmentUpdated?: () => void
