@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { UserPlus, Key, Mail, Lock, Eye, EyeOff, Copy, Check } from "lucide-react"
-import { toast } from "sonner"
+import { useToast } from "@/hooks/use-toast"
 
 interface CreateUserProps {
   isOpen: boolean
@@ -45,6 +45,7 @@ export default function CreateUser({
   const [showPassword, setShowPassword] = useState(false)
   const [copyingPassword, setCopyingPassword] = useState(false)
   const [copyingEmail, setCopyingEmail] = useState(false)
+    const { toast } = useToast()
 
   const handleCopy = async (text: string, type: 'email' | 'password') => {
     await navigator.clipboard.writeText(text)
@@ -55,7 +56,11 @@ export default function CreateUser({
       setCopyingEmail(true)
       setTimeout(() => setCopyingEmail(false), 2000)
     }
-    toast.success(`${type} copied to clipboard!`)
+    toast({
+        title: "Sucess",
+        description: `${type} copied to clipboard!`,
+        variant: "destructive",
+      })
   }
 
   return (
@@ -66,7 +71,7 @@ export default function CreateUser({
           Add New User
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="text-black sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-black">Create New User</DialogTitle>
         </DialogHeader>

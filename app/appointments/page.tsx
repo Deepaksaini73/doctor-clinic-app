@@ -1,12 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
 import MainLayout from "@/components/layout/main-layout"
 import AppointmentsList from "@/components/appointments_dashboard/Appointments_List"
 import CreateAppointment from "@/components/appointments_dashboard/Create_Appointment"
 import { database } from "@/lib/firebase"
 import { ref, onValue } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
+
 
 interface Appointment {
   id: string
@@ -22,6 +25,12 @@ interface Appointment {
   priority: string
 }
 
+interface Doctor {
+  id: string
+  name: string
+  specialization: string
+}
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -35,6 +44,7 @@ export default function AppointmentsPage() {
     priority: "routine"
   })
   const [searchQuery, setSearchQuery] = useState("")
+  const [doctors, setDoctors] = useState<Doctor[]>([])
   const { toast } = useToast()
 
   useEffect(() => {
@@ -62,6 +72,25 @@ export default function AppointmentsPage() {
     return () => unsubscribe()
   }, [])
 
+  useEffect(() => {
+    const doctorsRef = ref(database, 'doctors')
+    
+    const unsubscribe = onValue(doctorsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const doctorsData = snapshot.val()
+        const doctorsArray = Object.entries(doctorsData).map(([id, data]: [string, any]) => ({
+          id,
+          ...data
+        })) as Doctor[]
+        setDoctors(doctorsArray)
+      } else {
+        setDoctors([])
+      }
+    })
+
+    return () => unsubscribe()
+  }, [])
+
   const filteredAppointments = appointments.filter(
     (appointment) =>
       appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,6 +99,14 @@ export default function AppointmentsPage() {
         symptom.toLowerCase().includes(searchQuery.toLowerCase())
       )
   )
+
+  const handleCreateSuccess = () => {
+    setIsCreateModalOpen(false)
+    toast({
+      title: "Success",
+      description: "Appointment created successfully"
+    })
+  }
 
   return (
     <MainLayout title="Appointments" subtitle="Manage and track all appointments">
@@ -80,17 +117,28 @@ export default function AppointmentsPage() {
             <h1 className="text-2xl font-semibold text-gray-900">List Appointments</h1>
             <p className="text-gray-600">Here is the latest update for the last 7 days, check now.</p>
           </div>
-          <CreateAppointment
-            isOpen={isCreateModalOpen}
-            onOpenChange={setIsCreateModalOpen}
-            newAppointment={newAppointment}
-            onNewAppointmentChange={setNewAppointment}
-            onCreateAppointment={() => {}}
-          />
+          <Button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Appointment
+          </Button>
         </div>
 
+        {/* Create Appointment Modal */}
+        <CreateAppointment
+          isOpen={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          doctors={doctors}
+          onSuccess={handleCreateSuccess}
+        />
+
         {/* Appointments List */}
-        <AppointmentsList appointments={filteredAppointments} onSearch={setSearchQuery} />
+        <AppointmentsList 
+          appointments={filteredAppointments} 
+          onSearch={setSearchQuery} 
+        />
       </div>
     </MainLayout>
   )

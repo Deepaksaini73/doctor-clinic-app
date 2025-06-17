@@ -152,12 +152,14 @@ export default function AnalyticsDashboard() {
 
   return (
     <div className="space-y-4">
-      <Alert className="bg-blue-50 border-blue-200">
+      {/* <Alert className="bg-blue-50 border-blue-200">
         <AlertDescription className="text-blue-800">
           <strong>ML Integration Point:</strong> This dashboard will be enhanced with predictive analytics from your ML
           system to forecast patient volume and resource needs.
         </AlertDescription>
-      </Alert>
+      </Alert> */}
+
+      <h2 className="text-2xl font-bold text-gray-900">Analytics DashBoard</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard

@@ -7,11 +7,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import MainLayout from "@/components/layout/main-layout"
-import { ref, onValue, push, remove, DataSnapshot, get } from "firebase/database"
+import { ref, onValue, push, remove, DataSnapshot, get, update } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Toaster } from "@/components/ui/toaster"
 
@@ -39,7 +45,18 @@ export default function DoctorsPage() {
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null)
   const { toast } = useToast()
 
-  const [newDoctor, setNewDoctor] = useState({
+  const timeOptions = Array.from({ length: 24 }, (_, i) => {
+    const hour = i;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return {
+      value: `${hour.toString().padStart(2, '0')}:00`,
+      label: `${hour12}:00 ${ampm}`
+    };
+  });
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const emptyDoctor = {
     name: "",
     email: "",
     specialization: "",
@@ -47,8 +64,12 @@ export default function DoctorsPage() {
     experience: "",
     qualification: "",
     availableDays: [] as string[],
-    availableHours: "",
-  })
+    availableTime: {
+      start: "",
+      end: ""
+    }
+  };
+  const [newDoctor, setNewDoctor] = useState(emptyDoctor);
 
   const specializations = [
     "Cardiology",
@@ -92,7 +113,7 @@ export default function DoctorsPage() {
     return matchesSearch && matchesSpecialization
   })
 
-  const handleAddDoctor = () => {
+  const handleAddOrUpdateDoctor = async () => {
     if (!newDoctor.name || !newDoctor.email || !newDoctor.specialization) {
       toast({
         title: "Error",
@@ -102,8 +123,7 @@ export default function DoctorsPage() {
       return
     }
 
-    const doctor: Doctor = {
-      id: Date.now().toString(),
+    const doctorData = {
       name: newDoctor.name,
       email: newDoctor.email,
       specialization: newDoctor.specialization,
@@ -112,32 +132,40 @@ export default function DoctorsPage() {
       qualification: newDoctor.qualification,
       availability: {
         days: newDoctor.availableDays,
-        hours: newDoctor.availableHours,
+        hours: `${newDoctor.availableTime.start} - ${newDoctor.availableTime.end}`,
       },
       status: "active",
       joinDate: new Date().toISOString().split("T")[0],
+    };
+
+    try {
+      const doctorsRef = ref(database, 'doctors');
+      if (isEditMode && editingDoctor) {
+        await update(ref(database, `doctors/${editingDoctor.id}`), doctorData);
+        toast({
+          title: "Success",
+          description: "Doctor updated successfully",
+        });
+      } else {
+        await push(doctorsRef, doctorData);
+        toast({
+          title: "Success",
+          description: "Doctor added successfully",
+        });
+      }
+
+      setNewDoctor(emptyDoctor);
+      setIsAddDialogOpen(false);
+      setIsEditMode(false);
+      setEditingDoctor(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save doctor information",
+        variant: "destructive",
+      });
     }
-
-    const doctorsRef = ref(database, 'doctors');
-    push(doctorsRef, doctor);
-
-    setNewDoctor({
-      name: "",
-      email: "",
-      specialization: "",
-      phone: "",
-      experience: "",
-      qualification: "",
-      availableDays: [],
-      availableHours: "",
-    })
-    setIsAddDialogOpen(false)
-
-    toast({
-      title: "Success",
-      description: "Doctor added successfully",
-    })
-  }
+  };
 
   const handleDeleteDoctor = async (id: string) => {
     try {
@@ -175,6 +203,24 @@ export default function DoctorsPage() {
       ),
     )
   }
+
+  const handleEditDoctor = (doctor: Doctor) => {
+    setIsEditMode(true);
+    setNewDoctor({
+      name: doctor.name,
+      email: doctor.email,
+      specialization: doctor.specialization,
+      phone: doctor.phone,
+      experience: doctor.experience.toString(),
+      qualification: doctor.qualification,
+      availableDays: doctor.availability.days,
+      availableTime: {
+        start: doctor.availability.hours.split(" - ")[0],
+        end: doctor.availability.hours.split(" - ")[1]
+      }
+    });
+    setIsAddDialogOpen(true);
+  };
 
   const stats = {
     totalDoctors: doctors.length,
@@ -227,9 +273,9 @@ export default function DoctorsPage() {
                     Add Doctor
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="text-black max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Add New Doctor</DialogTitle>
+                    <DialogTitle>{isEditMode ? "Edit Doctor" : "Add New Doctor"}</DialogTitle>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -333,18 +379,60 @@ export default function DoctorsPage() {
                     </div>
 
                     <div>
-                      <Label htmlFor="hours">Available Hours</Label>
-                      <Input
-                        id="hours"
-                        value={newDoctor.availableHours}
-                        onChange={(e) => setNewDoctor({ ...newDoctor, availableHours: e.target.value })}
-                        placeholder="9:00 AM - 5:00 PM"
-                      />
+                      <Label>Available Hours</Label>
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                          <Label>Start Time</Label>
+                          <Select
+                            value={newDoctor.availableTime.start}
+                            onValueChange={(value) => 
+                              setNewDoctor({
+                                ...newDoctor,
+                                availableTime: { ...newDoctor.availableTime, start: value }
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select start time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {timeOptions.map((time) => (
+                                <SelectItem key={time.value} value={time.value}>
+                                  {time.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>End Time</Label>
+                          <Select
+                            value={newDoctor.availableTime.end}
+                            onValueChange={(value) => 
+                              setNewDoctor({
+                                ...newDoctor,
+                                availableTime: { ...newDoctor.availableTime, end: value }
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select end time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {timeOptions.map((time) => (
+                                <SelectItem key={time.value} value={time.value}>
+                                  {time.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-2 pt-4">
-                      <Button onClick={handleAddDoctor} className="bg-blue-600 hover:bg-blue-700 flex-1">
-                        Add Doctor
+                      <Button onClick={handleAddOrUpdateDoctor} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                        {isEditMode ? "Update Doctor" : "Add Doctor"}
                       </Button>
                       <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="flex-1">
                         Cancel

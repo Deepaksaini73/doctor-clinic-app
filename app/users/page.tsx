@@ -1,58 +1,66 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { database } from "@/lib/firebase"
+import { ref, push, get, set, remove } from "firebase/database"
 import MainLayout from "@/components/layout/main-layout"
 import UsersList from "@/components/users_dashboard/Users_List"
 import CreateUser from "@/components/users_dashboard/Create_User"
 import UsersStats from "@/components/users_dashboard/Users_Stats"
+import { useToast } from "@/hooks/use-toast"
+
+interface User {
+  id: string
+  name: string
+  email: string
+  role: "admin" | "doctor" | "receptionist"
+  status: "Active" | "Inactive"
+  created: string
+  lastLogin: string
+}
 
 export default function UsersPage() {
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: "Dr. Sarah Johnson",
-      email: "sarah.johnson@clinicare.com",
-      role: "doctor",
-      status: "Active",
-      created: "2024-01-15",
-      lastLogin: "2024-03-15 09:30",
-    },
-    {
-      id: 2,
-      name: "Maria Rodriguez",
-      email: "maria.rodriguez@clinicare.com",
-      role: "receptionist",
-      status: "Active",
-      created: "2024-02-01",
-      lastLogin: "2024-03-15 08:45",
-    },
-    {
-      id: 3,
-      name: "Admin User",
-      email: "admin@clinicare.com",
-      role: "admin",
-      status: "Active",
-      created: "2024-01-01",
-      lastLogin: "2024-03-15 10:15",
-    },
-    {
-      id: 4,
-      name: "Dr. Michael Chen",
-      email: "michael.chen@clinicare.com",
-      role: "doctor",
-      status: "Inactive",
-      created: "2024-02-15",
-      lastLogin: "2024-03-10 14:20",
-    },
-  ])
-
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const { toast } = useToast()
+  
   const [newUser, setNewUser] = useState({
     name: "",
     role: "",
     email: "",
     password: "",
   })
+
+  // Fetch users on component mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const usersRef = ref(database, 'users')
+        const snapshot = await get(usersRef)
+        
+        if (snapshot.exists()) {
+          const usersData = snapshot.val()
+          const usersArray = Object.entries(usersData).map(([id, data]: [string, any]) => ({
+            id,
+            ...data
+          }))
+          setUsers(usersArray)
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch users",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUsers()
+  }, [toast])
 
   const generateCredentials = (role: string) => {
     const timestamp = Date.now()
@@ -66,23 +74,73 @@ export default function UsersPage() {
     })
   }
 
-  const handleCreateUser = () => {
-    if (newUser.name && newUser.role && newUser.email) {
-      const user = {
-        id: users.length + 1,
+  const handleCreateUser = async () => {
+    if (!newUser.name || !newUser.role || !newUser.email) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const usersRef = ref(database, 'users')
+      const newUserRef = push(usersRef)
+      
+      const userData = {
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
+        password: newUser.password, // Note: In production, handle password securely
         status: "Active",
         created: new Date().toISOString().split("T")[0],
         lastLogin: "Never",
       }
-      setUsers([...users, user])
+
+      await set(newUserRef, userData)
+
+      // Update local state
+      setUsers([...users, { id: newUserRef.key!, ...userData }])
+      
+      // Reset form and close modal
       setNewUser({ name: "", role: "", email: "", password: "" })
       setIsCreateModalOpen(false)
+
+      toast({
+        title: "Success",
+        description: "User created successfully",
+      })
+    } catch (error) {
+      console.error('Error creating user:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create user",
+        variant: "destructive",
+      })
     }
   }
 
+  const refreshUsers = async () => {
+    setIsLoading(true)
+    try {
+      const usersRef = ref(database, 'users')
+      const snapshot = await get(usersRef)
+      if (snapshot.exists()) {
+        const usersData = Object.entries(snapshot.val()).map(([id, data]: [string, any]) => ({
+          id,
+          ...data
+        }))
+        setUsers(usersData)
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Calculate statistics
   const totalUsers = users.length
   const adminUsers = users.filter((u) => u.role === "admin").length
   const doctorUsers = users.filter((u) => u.role === "doctor").length
@@ -91,7 +149,6 @@ export default function UsersPage() {
   return (
     <MainLayout title="User Management" subtitle="Manage system users and their access permissions">
       <div className="space-y-6">
-        {/* Statistics Cards */}
         <UsersStats
           totalUsers={totalUsers}
           adminUsers={adminUsers}
@@ -99,7 +156,6 @@ export default function UsersPage() {
           receptionistUsers={receptionistUsers}
         />
 
-        {/* Users List */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">System Users</h2>
           <CreateUser
@@ -111,8 +167,48 @@ export default function UsersPage() {
             onGenerateCredentials={generateCredentials}
           />
         </div>
-        <UsersList users={users} />
+        
+        <UsersList 
+          users={users} 
+          isLoading={isLoading}
+          onUserDeleted={refreshUsers}  // Pass the refresh function
+        />
       </div>
     </MainLayout>
   )
+}
+
+// filepath: d:\hackthon\june court\theme 2\components\users_dashboard\Users_List.tsx
+
+// Update handleDelete function
+const handleDelete = async (userId: string) => {
+  setIsDeleting(true)
+  try {
+    const userRef = ref(database, `users/${userId}`)
+    await remove(userRef)
+    
+    // Close both dialogs and reset states
+    setShowDeleteConfirm(false)
+    setDialogOpen(false)
+    setSelectedUser(null)
+    
+    // Call onUserDeleted if it exists
+    if (typeof onUserDeleted === 'function') {
+      onUserDeleted()
+    }
+    
+    toast({
+      title: "Success",
+      description: "User deleted successfully",
+    })
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    toast({
+      title: "Error",
+      description: "Failed to delete user",
+      variant: "destructive",
+    })
+  } finally {
+    setIsDeleting(false)
+  }
 }
