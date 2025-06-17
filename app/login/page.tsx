@@ -12,6 +12,24 @@ import { Eye, EyeOff, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
+const DEMO_CREDENTIALS = {
+  admin: {
+    email: "admin@clinic.com",
+    password: "admin123",
+    label: "Admin Demo Login",
+  },
+  doctor: {
+    email: "sarah@clinic.com",
+    password: "doctor123",
+    label: "Doctor Demo Login",
+  },
+  receptionist: {
+    email: "receptionist@clinic.com",
+    password: "password123",
+    label: "Receptionist Demo Login",
+  },
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -107,6 +125,19 @@ export default function LoginPage() {
     }
   }
 
+  const autoLogin = async (role: keyof typeof DEMO_CREDENTIALS) => {
+    const credentials = DEMO_CREDENTIALS[role]
+    setEmail(credentials.email)
+    setPassword(credentials.password)
+
+    // Small delay to show the form filling
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // Trigger form submission
+    const submitEvent = new Event("submit", { cancelable: true })
+    document.querySelector("form")?.dispatchEvent(submitEvent)
+  }
+
   return (
     <>
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -197,19 +228,40 @@ export default function LoginPage() {
             </CardContent>
           </Card>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</p>
-            <div className="text-xs text-blue-800 space-y-1">
-              <p>
-                <strong>Admin:</strong> admin@clinic.com / admin123
-              </p>
-              <p>
-                <strong>Doctor:</strong> sarah@clinic.com / doctor123
-              </p>
-              <p>
-                <strong>Receptionist:</strong> receptionist@clinic.com / password123
-              </p>
+          {/* Demo Login Buttons */}
+          <div className="mt-6 space-y-3">
+            <p className="text-sm font-medium text-blue-900 mb-2">Quick Demo Access:</p>
+            <div className="grid grid-cols-1 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-blue-200 hover:bg-blue-50 text-blue-700"
+                onClick={() => autoLogin("admin")}
+                disabled={isLoading}
+              >
+                <User className="w-4 h-4 mr-2" />
+                Admin Demo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-blue-200 hover:bg-blue-50 text-blue-700"
+                onClick={() => autoLogin("doctor")}
+                disabled={isLoading}
+              >
+                <User className="w-4 h-4 mr-2" />
+                Doctor Demo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-blue-200 hover:bg-blue-50 text-blue-700"
+                onClick={() => autoLogin("receptionist")}
+                disabled={isLoading}
+              >
+                <User className="w-4 h-4 mr-2" />
+                Receptionist Demo
+              </Button>
             </div>
           </div>
 
