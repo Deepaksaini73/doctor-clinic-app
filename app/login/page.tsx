@@ -14,18 +14,18 @@ import { Toaster } from "@/components/ui/toaster"
 
 const DEMO_CREDENTIALS = {
   admin: {
-    email: "admin@clinic.com",
-    password: "admin123",
+    email: "clinicare@gmail.com",
+    password: "clinicare@123",
     label: "Admin Demo Login",
   },
   doctor: {
-    email: "sarah@clinic.com",
-    password: "doctor123",
+    email: "dr.rnbijarniya@gmail.com",
+    password: "ramniwas@123",
     label: "Doctor Demo Login",
   },
   receptionist: {
-    email: "receptionist@clinic.com",
-    password: "password123",
+    email: "ankitajain@gmail.com",
+    password: "ankitajain@123",
     label: "Receptionist Demo Login",
   },
 }
@@ -219,12 +219,12 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              <div className="text-center mt-6">
+              {/* <div className="text-center mt-6">
                 <span className="text-sm text-gray-600">Don't have account? </span>
                 <Button variant="link" className="text-blue-600 p-0 h-auto">
                   Register
                 </Button>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
