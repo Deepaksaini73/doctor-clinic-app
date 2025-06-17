@@ -192,7 +192,7 @@ export default function CreateAppointment({
           Create Appointment
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className=" text-black sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create New Appointment</DialogTitle>
         </DialogHeader>
