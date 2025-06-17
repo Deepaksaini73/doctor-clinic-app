@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { Appointment, Patient } from "@/lib/types"
+import type { Appointment, Patient, Doctor } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import MainLayout from "@/components/layout/main-layout"
 import PrescriptionEditor from "@/components/doctor_dashboard/prescription-editor"
@@ -9,13 +9,15 @@ import PatientList from "@/components/doctor_dashboard/Patient_List"
 import PatientProfile from "@/components/doctor_dashboard/Patient_Profile"
 import { database } from "@/lib/firebase"
 import { ref, onValue, get } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 
 export default function DoctorDashboardPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [patient, setPatient] = useState<Patient | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [doctorName, setDoctorName] = useState("")
   const { toast } = useToast()
 
   // Fetch appointments
@@ -99,12 +101,30 @@ export default function DoctorDashboardPage() {
     }
   }, [selectedAppointment, toast])
 
+    // Get doctor's name from localStorage
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem("user")
+      if (userData) {
+        const user = JSON.parse(userData) as Doctor
+        setDoctorName(user.name)
+      }
+    } catch (error) {
+      console.error("Error getting doctor's name:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load doctor information",
+        variant: "destructive",
+      })
+    }
+  }, [toast])
+
   const handleSelectAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
   }
 
   return (
-    <MainLayout title="Welcome back, Dr. Smith!" subtitle="Patient management and AI-assisted prescriptions">
+    <MainLayout title={`Welcome back, ${doctorName || 'Doctor'}!`}  subtitle="Patient management and AI-assisted prescriptions">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Patients */}
         <PatientList
@@ -122,7 +142,7 @@ export default function DoctorDashboardPage() {
               <PatientProfile appointment={selectedAppointment} patient={patient} />
 
               {/* AI-Assisted Prescription */}
-              <PrescriptionEditor appointment={selectedAppointment} symptoms={selectedAppointment.symptoms} />
+              <PrescriptionEditor appointment={selectedAppointment} symptoms={selectedAppointment.symptoms} onClose={() => setSelectedAppointment(null)} />
             </>
           ) : (
             <Card className="h-64 flex items-center justify-center">
@@ -134,5 +154,6 @@ export default function DoctorDashboardPage() {
         </div>
       </div>
     </MainLayout>
+
   )
 }

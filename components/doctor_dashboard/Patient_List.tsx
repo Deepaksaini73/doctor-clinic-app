@@ -66,45 +66,49 @@ export default function PatientList({
   }
 
   const renderAppointmentList = (appointments: Appointment[], title: string) => {
-    if (appointments.length === 0) return null
+  if (appointments.length === 0) return null
 
-    return (
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3 text-gray-900">{title}</h3>
-        <div className="space-y-2">
-          {appointments.map((appointment) => (
-            <div
-              key={appointment.id}
-              className={`border rounded-lg p-4 cursor-pointer hover:bg-gray-50 ${
-                selectedAppointment?.id === appointment.id ? "border-blue-600 border-l-4 bg-blue-50" : "border-gray-200"
-              }`}
-              onClick={() => onSelectAppointment(appointment)}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                  <span className="text-gray-600 font-medium text-sm">{appointment.patientName.charAt(0)}</span>
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">
-                    {appointment.patientName}{" "}
-                    <span className="text-sm text-gray-500">({appointment.patientAge}y)</span>
-                  </h3>
-                  <p className="text-sm text-gray-600">{appointment.symptoms.join(", ")}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-medium">{appointment.time}</span>
-                </div>
+  return (
+    <div className="mb-6">
+      <h3 className="text-lg font-semibold mb-3 text-gray-900">{title}</h3>
+      <div className="space-y-2">
+        {appointments.map((appointment) => (
+          <div
+            key={appointment.id}
+            className={`border rounded-lg p-4 cursor-pointer hover:bg-gray-50 ${
+              selectedAppointment?.id === appointment.id ? "border-blue-600 border-l-4 bg-blue-50" : "border-gray-200"
+            }`}
+            onClick={() => onSelectAppointment(appointment)}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                <span className="text-gray-600 font-medium text-sm">{appointment.patientName.charAt(0)}</span>
               </div>
-              <div className="flex gap-2">
-                {getStatusBadge(appointment.status)}
-                {getPriorityBadge(appointment.priority)}
+              <div className="flex-1">
+                <h3 className="font-medium text-gray-900">
+                  {appointment.patientName}{" "}
+                  <span className="text-sm text-gray-500">({appointment.patientAge}y)</span>
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {appointment.symptoms?.length > 0 
+                    ? appointment.symptoms.join(", ")
+                    : "No symptoms recorded"}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-medium">{appointment.time}</span>
               </div>
             </div>
-          ))}
-        </div>
+            <div className="flex gap-2">
+              {getStatusBadge(appointment.status)}
+              {getPriorityBadge(appointment.priority)}
+            </div>
+          </div>
+        ))}
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   return (
     <Card>

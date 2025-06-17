@@ -4,11 +4,12 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { Doctor } from "@/lib/types"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { database } from "@/lib/firebase"
 import { ref, onValue, remove } from "firebase/database"
 import { Trash2 } from "lucide-react"
 import { AnimatedButton } from "@/components/ui/animated-button"
+
 
 export default function DoctorAvailability() {
   const [doctors, setDoctors] = useState<Doctor[]>([])

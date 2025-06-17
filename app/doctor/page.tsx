@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import LoginForm from "@/components/doctor_dashboard/login-form"
 
 export default function DoctorLoginPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -35,8 +34,6 @@ export default function DoctorLoginPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Doctor Portal</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Sign in to access your dashboard</p>
         </div>
-
-        <LoginForm />
       </div>
     </div>
   )

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import { database } from "@/lib/firebase"
 import { ref, update, remove } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import {
   DropdownMenu,
   DropdownMenuContent,

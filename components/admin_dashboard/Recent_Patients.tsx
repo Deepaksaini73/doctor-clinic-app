@@ -13,7 +13,7 @@ import { AnimatedButton } from "@/components/ui/animated-button"
 import { CardSkeleton } from "@/components/ui/loading-skeleton"
 import { database } from "@/lib/firebase"
 import { ref, onValue, remove } from "firebase/database"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface Appointment {
   id: string

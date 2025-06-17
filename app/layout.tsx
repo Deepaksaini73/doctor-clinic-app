@@ -4,13 +4,13 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { ToastProvider } from "@/providers/toast-providers"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "Smart Clinic System",
-  description: "Next-generation clinic management system with voice input and AI assistance",
-    generator: 'v0.dev'
+  description: "Next-generation clinic management system with voice input and AI assistance"
 }
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <Toaster />
+          <ToastProvider />
         </ThemeProvider>
       </body>
     </html>

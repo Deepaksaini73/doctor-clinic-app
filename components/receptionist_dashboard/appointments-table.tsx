@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import type { Appointment } from "@/lib/types"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Search, MoreVertical } from "lucide-react"
 import { database } from "@/lib/firebase"
 import { ref, onValue, update, remove } from "firebase/database"

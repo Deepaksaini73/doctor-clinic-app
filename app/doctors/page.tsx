@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import MainLayout from "@/components/layout/main-layout"
 import { ref, onValue, push, remove, DataSnapshot, get } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { Toaster } from "@/components/ui/toaster"
 
 interface Doctor {
   id: string
@@ -516,5 +517,6 @@ export default function DoctorsPage() {
         </Card>
       </div>
     </MainLayout>
+
   )
 }
