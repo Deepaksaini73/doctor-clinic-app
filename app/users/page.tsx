@@ -177,38 +177,3 @@ export default function UsersPage() {
     </MainLayout>
   )
 }
-
-// filepath: d:\hackthon\june court\theme 2\components\users_dashboard\Users_List.tsx
-
-// Update handleDelete function
-const handleDelete = async (userId: string) => {
-  setIsDeleting(true)
-  try {
-    const userRef = ref(database, `users/${userId}`)
-    await remove(userRef)
-    
-    // Close both dialogs and reset states
-    setShowDeleteConfirm(false)
-    setDialogOpen(false)
-    setSelectedUser(null)
-    
-    // Call onUserDeleted if it exists
-    if (typeof onUserDeleted === 'function') {
-      onUserDeleted()
-    }
-    
-    toast({
-      title: "Success",
-      description: "User deleted successfully",
-    })
-  } catch (error) {
-    console.error('Error deleting user:', error)
-    toast({
-      title: "Error",
-      description: "Failed to delete user",
-      variant: "destructive",
-    })
-  } finally {
-    setIsDeleting(false)
-  }
-}
