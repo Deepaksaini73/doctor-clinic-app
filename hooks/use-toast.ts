@@ -130,8 +130,23 @@ let dispatch = (action: Action) => {
 
 type Toast = Omit<ToastProps, "id">
 
+// Add UUID generator function
+function generateUUID(): string {
+  // Timestamp-based fallback
+  const timestamp = new Date().getTime()
+  const random = Math.floor(Math.random() * 1000000)
+  return `toast-${timestamp}-${random}`
+}
+
+// Update toast function
 export function toast({ ...props }: Toast) {
-  const id = crypto.randomUUID()
+  // Use try-catch for crypto.randomUUID with fallback
+  let id: string
+  try {
+    id = crypto.randomUUID()
+  } catch (error) {
+    id = generateUUID()
+  }
 
   const update = (props: ToastProps) =>
     dispatch({

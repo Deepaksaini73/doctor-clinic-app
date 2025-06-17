@@ -1,297 +1,403 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { database } from "@/lib/firebase"
-import { ref, onValue, push, set } from "firebase/database"
+import { ref, push, set, get } from "firebase/database"
 import { useToast } from "@/hooks/use-toast"
 
-interface Doctor {
-  id: string
-  name: string
-  specialization: string
-  availability: {
-    days: string[]
-    hours: string
-  }
-  imageUrl: string
-}
-
+// Add interface for Patient
 interface Patient {
-  id: string
+  patientId: string
   name: string
   age: number
-  gender: string
+  gender: "male" | "female" | "other"
   contact: string
-  medicalHistory: {
-    allergies: string[]
-    chronicConditions: string[]
-    pastVisits: Array<{
-      id: string
-      date: string
-      doctorId: string
-      doctorName: string
-      symptoms: string[]
-      diagnosis: string
-      prescription: {
-        id: string
-        medicines: Array<{
-          name: string
-          dosage: string
-          frequency: string
-          duration: string
-        }>
-        instructions: string
-      }
-    }>
-  }
-}
-
-interface CreateAppointmentProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  newAppointment: {
-    patientId: string
-    doctorId: string
-    date: string
-    time: string
-    symptoms: string[]
-    status: string
-    priority: string
-  }
-  onNewAppointmentChange: (appointment: any) => void
-  onCreateAppointment: () => void
 }
 
 export default function CreateAppointment({
   isOpen,
   onOpenChange,
-  newAppointment,
-  onNewAppointmentChange,
-  onCreateAppointment,
-}: CreateAppointmentProps) {
-  const [doctors, setDoctors] = useState<Doctor[]>([])
-  const [patients, setPatients] = useState<Patient[]>([])
+  doctors = [],
+  onSuccess
+}: {
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  doctors: Doctor[]
+  onSuccess: () => void
+}) {
   const { toast } = useToast()
-
-  useEffect(() => {
-    // Fetch doctors
-    const doctorsRef = ref(database, 'doctors')
-    const doctorsUnsubscribe = onValue(doctorsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const doctorsData = snapshot.val()
-        const doctorsArray = Object.entries(doctorsData).map(([id, data]: [string, any]) => ({
-          id,
-          ...data
-        })) as Doctor[]
-        setDoctors(doctorsArray)
-      }
-    })
-
-    // Fetch patients
-    const patientsRef = ref(database, 'patients')
-    const patientsUnsubscribe = onValue(patientsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const patientsData = snapshot.val()
-        const patientsArray = Object.entries(patientsData).map(([id, data]: [string, any]) => ({
-          id,
-          ...data
-        })) as Patient[]
-        setPatients(patientsArray)
-      }
-    })
-
-    return () => {
-      doctorsUnsubscribe()
-      patientsUnsubscribe()
-    }
-  }, [])
+  const [patientType, setPatientType] = useState<"new" | "existing">("new")
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchPatientId, setSearchPatientId] = useState("")
+  const [formData, setFormData] = useState({
+    patientName: "",
+    patientAge: "",
+    patientGender: "",
+    contactNumber: "",
+    doctorId: "",
+    appointmentDate: "",
+    appointmentTime: "",
+    symptoms: "",
+    priority: "routine"
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
     try {
+      // Validate required fields
+      if (!formData.patientName || !formData.doctorId || !formData.appointmentDate) {
+        throw new Error("Please fill all required fields")
+      }
+
+      let patientId = searchPatientId
+
+      // If new patient, create patient record first
+      if (patientType === "new") {
+        patientId = `PAT${Date.now()}`
+        const patientsRef = ref(database, 'patients')
+        const newPatientRef = push(patientsRef)
+        
+        await set(newPatientRef, {
+          patientId,
+          name: formData.patientName,
+          age: parseInt(formData.patientAge),
+          gender: formData.patientGender,
+          contact: formData.contactNumber,
+          createdAt: new Date().toISOString()
+        })
+      }
+
+      // Create appointment with patient reference
       const appointmentsRef = ref(database, 'appointments')
       const newAppointmentRef = push(appointmentsRef)
       
-      // Get selected patient and doctor details
-      const selectedPatient = patients.find(p => p.id === newAppointment.patientId)
-      const selectedDoctor = doctors.find(d => d.id === newAppointment.doctorId)
+      const selectedDoctor = doctors.find(d => d.id === formData.doctorId)
+      if (!selectedDoctor) throw new Error("Doctor not found")
 
-      if (!selectedPatient || !selectedDoctor) {
-        throw new Error("Patient or doctor not found")
-      }
+      // Format date and time properly
+      const appointmentDate = new Date(formData.appointmentDate)
+      const [hours, minutes] = formData.appointmentTime.split(':')
+      appointmentDate.setHours(parseInt(hours), parseInt(minutes))
 
-      // Create appointment with the structure matching mock-data.ts
+      const formattedDate = appointmentDate.toISOString().split('T')[0]
+      const formattedTime = `${hours}:${minutes}`
+
       await set(newAppointmentRef, {
         id: newAppointmentRef.key,
-        patientId: newAppointment.patientId,
-        patientName: selectedPatient.name,
-        patientAge: selectedPatient.age,
-        doctorId: newAppointment.doctorId,
+        patientId,
+        patientName: formData.patientName,
+        patientAge: parseInt(formData.patientAge),
+        gender: formData.patientGender,
+        mobileNumber: formData.contactNumber,
+        doctorId: formData.doctorId,
         doctorName: selectedDoctor.name,
-        date: newAppointment.date,
-        time: newAppointment.time,
-        symptoms: newAppointment.symptoms,
-        status: newAppointment.status,
-        priority: newAppointment.priority
-      })
-
-      // Update patient's medical history with new visit
-      const patientRef = ref(database, `patients/${newAppointment.patientId}/medicalHistory/pastVisits`)
-      const newVisitRef = push(patientRef)
-      await set(newVisitRef, {
-        id: newVisitRef.key,
-        date: newAppointment.date,
-        doctorId: newAppointment.doctorId,
-        doctorName: selectedDoctor.name,
-        symptoms: newAppointment.symptoms,
-        diagnosis: "", // To be filled by doctor during visit
-        prescription: {
-          id: `pr${Date.now()}`,
-          medicines: [],
-          instructions: ""
-        }
+        date: formattedDate, // Use consistent date format
+        time: formattedTime,
+        timestamp: appointmentDate.getTime(), // Add timestamp for easier filtering
+        symptoms: formData.symptoms.split(',').map(s => s.trim()).filter(Boolean),
+        status: "scheduled",
+        priority: formData.priority,
+        createdAt: new Date().toISOString()
       })
 
       toast({
         title: "Success",
-        description: "Appointment created successfully",
+        description: patientType === "new" 
+          ? `New patient created with ID: ${patientId} and appointment scheduled`
+          : "Appointment created successfully",
       })
 
+      onSuccess()
       onOpenChange(false)
+      
+      // Reset form
+      setFormData({
+        patientName: "",
+        patientAge: "",
+        patientGender: "",
+        contactNumber: "",
+        doctorId: "",
+        appointmentDate: "",
+        appointmentTime: "",
+        symptoms: "",
+        priority: "routine"
+      })
+      setSearchPatientId("")
+
     } catch (error) {
-      console.error("Error creating appointment:", error)
       toast({
         title: "Error",
-        description: "Failed to create appointment",
+        description: error instanceof Error ? error.message : "Failed to create appointment",
         variant: "destructive",
       })
     }
   }
 
+  // Add patient search handler
+  const handlePatientSearch = async () => {
+    if (!searchPatientId) {
+      toast({
+        title: "Error",
+        description: "Please enter a patient ID",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const patientsRef = ref(database, 'patients')
+      const snapshot = await get(patientsRef)
+
+      if (snapshot.exists()) {
+        const patientsData = snapshot.val()
+        const patient = Object.values(patientsData).find((p: any) => p.patientId === searchPatientId)
+
+        if (patient) {
+          setFormData({
+            ...formData,
+            patientName: patient.name,
+            patientAge: patient.age.toString(),
+            patientGender: patient.gender,
+            contactNumber: patient.contact,
+          })
+          toast({
+            title: "Success",
+            description: "Patient information loaded successfully",
+          })
+        } else {
+          toast({
+            title: "Not Found",
+            description: "No patient found with this ID",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error searching patient:", error)
+      toast({
+        title: "Error",
+        description: "Failed to search patient",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button className="bg-blue-600 text-white hover:bg-blue-700">
-          Create Appointment
-        </Button>
-      </DialogTrigger>
-      <DialogContent className=" text-black sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Create New Appointment</DialogTitle>
+      <DialogContent className="text-black max-w-[95vw] md:max-w-[800px] h-[90vh] md:h-auto overflow-y-auto">
+        <DialogHeader className="mb-6">
+          <DialogTitle className="text-2xl font-bold text-gray-900">Create New Appointment</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="patient">Patient</Label>
-            <Select
-              value={newAppointment.patientId}
-              onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, patientId: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select patient" />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.name} ({patient.age} years, {patient.gender})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div className="space-y-6">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <RadioGroup
+                  defaultValue="new"
+                  value={patientType}
+                  onValueChange={(value) => setPatientType(value as "new" | "existing")}
+                  className="flex space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="new" id="new" />
+                    <Label htmlFor="new">New Patient</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="existing" id="existing" />
+                    <Label htmlFor="existing">Existing Patient</Label>
+                  </div>
+                </RadioGroup>
 
-          <div className="space-y-2">
-            <Label htmlFor="doctor">Doctor</Label>
-            <Select
-              value={newAppointment.doctorId}
-              onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, doctorId: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select doctor" />
-              </SelectTrigger>
-              <SelectContent>
-                {doctors.map((doctor) => (
-                  <SelectItem key={doctor.id} value={doctor.id}>
-                    {doctor.name} ({doctor.specialization})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                {patientType === "existing" && (
+                  <div className="mt-4 space-y-2">
+                    <Label>Patient ID</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter patient ID"
+                        value={searchPatientId}
+                        onChange={(e) => setSearchPatientId(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handlePatientSearch}
+                        disabled={isSearching}
+                      >
+                        {isSearching ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Search className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={newAppointment.date}
-                onChange={(e) => onNewAppointmentChange({ ...newAppointment, date: e.target.value })}
-                required
-              />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="patientName">Patient Name *</Label>
+                  <Input
+                    id="patientName"
+                    value={formData.patientName}
+                    onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+                    required
+                    className="bg-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="age">Age *</Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      value={formData.patientAge}
+                      onChange={(e) => setFormData({ ...formData, patientAge: e.target.value })}
+                      required
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Gender *</Label>
+                    <Select
+                      value={formData.patientGender}
+                      onValueChange={(value) => setFormData({ ...formData, patientGender: value })}
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="contact">Contact Number *</Label>
+                  <Input
+                    id="contact"
+                    value={formData.contactNumber}
+                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                    required
+                    className="bg-white"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="time">Time</Label>
-              <Input
-                id="time"
-                type="time"
-                value={newAppointment.time}
-                onChange={(e) => onNewAppointmentChange({ ...newAppointment, time: e.target.value })}
-                required
-              />
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="doctor">Select Doctor *</Label>
+                  <Select
+                    value={formData.doctorId}
+                    onValueChange={(value) => setFormData({ ...formData, doctorId: value })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder={doctors.length ? "Select doctor" : "No doctors available"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {doctors?.length > 0 ? (
+                        doctors.map((doctor) => (
+                          <SelectItem key={doctor.id} value={doctor.id}>
+                            {doctor.name} ({doctor.specialization})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          No doctors available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="date">Date *</Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      value={formData.appointmentDate}
+                      onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]}
+                      required
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="time">Time *</Label>
+                    <Input
+                      id="time"
+                      type="time"
+                      value={formData.appointmentTime}
+                      onChange={(e) => setFormData({ ...formData, appointmentTime: e.target.value })}
+                      required
+                      className="bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="symptoms">Symptoms</Label>
+                  <Input
+                    id="symptoms"
+                    placeholder="Enter symptoms (comma separated)"
+                    value={formData.symptoms}
+                    onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
+                    className="bg-white"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select
+                    value={formData.priority}
+                    onValueChange={(value) => setFormData({ ...formData, priority: value })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="routine">Routine</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="emergency">Emergency</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="symptoms">Symptoms</Label>
-            <Input
-              id="symptoms"
-              value={newAppointment.symptoms.join(", ")}
-              onChange={(e) => onNewAppointmentChange({ 
-                ...newAppointment, 
-                symptoms: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
-              })}
-              placeholder="Enter symptoms separated by commas"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="priority">Priority</Label>
-            <Select
-              value={newAppointment.priority}
-              onValueChange={(value) => onNewAppointmentChange({ ...newAppointment, priority: value })}
+          <div className="pt-6 border-t">
+            <Button 
+              type="submit" 
+              className="w-full bg-blue-600 text-white hover:bg-blue-700 h-11 text-lg"
+              disabled={!doctors?.length}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="urgent">Urgent</SelectItem>
-                <SelectItem value="routine">Routine</SelectItem>
-              </SelectContent>
-            </Select>
+              {doctors?.length ? "Create Appointment" : "No doctors available"}
+            </Button>
           </div>
-
-          <Button type="submit" className="w-full bg-blue-600 text-white hover:bg-blue-700">
-            Create Appointment
-          </Button>
         </form>
       </DialogContent>
     </Dialog>
   )
-} 
+}
