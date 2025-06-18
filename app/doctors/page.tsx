@@ -231,16 +231,21 @@ export default function DoctorsPage() {
   }
 
   const handleEditDoctor = (doctor: Doctor) => {
+    setEditingDoctor(doctor);
     setIsEditMode(true);
     setNewDoctor({
-      ...emptyDoctor, // Start with empty state
-      ...doctor, // Spread doctor data
+      name: doctor.name,
+      email: doctor.email,
+      specialization: doctor.specialization,
+      phone: doctor.phone || "",
+      experience: doctor.experience?.toString() || "",
+      qualification: doctor.qualification || "",
       availableDays: doctor.availability?.days || [],
       availableTime: {
         start: doctor.availability?.hours?.split(" - ")[0] || "",
-        end: doctor.availability?.hours?.split(" - ")[1] || "",
+        end: doctor.availability?.hours?.split(" - ")[1] || ""
       },
-      experience: doctor.experience?.toString() || "",
+      doctorId: doctor.doctorId
     });
     setIsAddDialogOpen(true);
   };
@@ -291,7 +296,14 @@ export default function DoctorsPage() {
               <CardTitle>All Doctors</CardTitle>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+                  <Button 
+                    onClick={() => {
+                      setIsEditMode(false);
+                      setNewDoctor(emptyDoctor);
+                      setIsAddDialogOpen(true);
+                    }} 
+                    className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Doctor
                   </Button>
@@ -317,6 +329,7 @@ export default function DoctorsPage() {
                           id="doctorId"
                           value={newDoctor.doctorId || ''} // Add fallback empty string
                           readOnly
+                          placeholder="auto fill by email"
                           className="bg-gray-50"
                         />
                       </div>
@@ -373,7 +386,10 @@ export default function DoctorsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="specialization">Specialization *</Label>
-                        <Select onValueChange={(value) => setNewDoctor({ ...newDoctor, specialization: value })}>
+                        <Select 
+                          value={newDoctor.specialization} 
+                          onValueChange={(value) => setNewDoctor({ ...newDoctor, specialization: value })}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select specialization" />
                           </SelectTrigger>
@@ -505,8 +521,8 @@ export default function DoctorsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Search and Filter */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Unified Search and Filter - Responsive for all screens */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6 sticky top-0 bg-white z-10">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -577,7 +593,11 @@ export default function DoctorsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEditDoctor(doctor)}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
@@ -597,72 +617,109 @@ export default function DoctorsPage() {
               </table>
             </div>
 
-            {/* Mobile Card View */}
+            {/* Mobile and Tablet Card View */}
             <div className="lg:hidden space-y-4">
-              {filteredDoctors.map((doctor) => (
-                <Card key={doctor.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center">
-                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                          <span className="text-blue-600 font-medium">
-                            {doctor.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </span>
+              <div className="space-y-4 mt-4">
+                {filteredDoctors.map((doctor) => (
+                  <Card key={doctor.id} className="overflow-hidden">
+                    <CardContent className="p-0">
+                      {/* Doctor Header */}
+                      <div className="p-4 bg-gray-50 border-b">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                              <span className="text-blue-600 font-medium text-lg">
+                                {doctor.name.split(" ").map((n) => n[0]).join("")}
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900 text-lg">{doctor.name}</h3>
+                              <p className="text-sm text-gray-600">{doctor.email}</p>
+                            </div>
+                          </div>
+                          <Badge
+                            className={`${
+                              doctor.status === "active" 
+                                ? "bg-green-100 text-green-800 border-green-200" 
+                                : "bg-red-100 text-red-800 border-red-200"
+                            } px-3 py-1 text-sm font-medium`}
+                            onClick={() => handleToggleStatus(doctor.id)}
+                          >
+                            {doctor.status}
+                          </Badge>
                         </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{doctor.name}</h3>
-                          <p className="text-sm text-gray-500">{doctor.specialization}</p>
+                      </div>
+
+                      {/* Doctor Details */}
+                      <div className="p-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-sm text-gray-500">Specialization</p>
+                            <p className="font-medium">{doctor.specialization}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm text-gray-500">Experience</p>
+                            <p className="font-medium">{doctor.experience} years</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-sm text-gray-500">Phone</p>
+                            <p className="font-medium">{doctor.phone || 'N/A'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm text-gray-500">Doctor ID</p>
+                            <p className="font-mono text-sm">{doctor.doctorId}</p>
+                          </div>
+                        </div>
+
+                        {/* Availability */}
+                        <div className="space-y-2">
+                          <p className="text-sm text-gray-500">Available Days</p>
+                          <div className="flex flex-wrap gap-1">
+                            {doctor.availability?.days.map((day) => (
+                              <Badge key={day} variant="secondary" className="bg-blue-50 text-blue-700">
+                                {day.slice(0, 3)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="flex-1 sm:flex-none h-10"
+                            onClick={() => handleEditDoctor(doctor)}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 sm:flex-none h-10 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                            onClick={() => handleDeleteDoctor(doctor.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
                         </div>
                       </div>
-                      <Badge
-                        className={
-                          doctor.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                        }
-                        onClick={() => handleToggleStatus(doctor.id)}
-                      >
-                        {doctor.status}
-                      </Badge>
-                    </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
-                      <div>
-                        <span className="text-gray-500">Experience:</span>
-                        <span className="ml-1 font-medium">{doctor.experience} years</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Phone:</span>
-                        <span className="ml-1 font-medium">{doctor.phone}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
-                      <div>
-                        <span className="text-gray-500">Doctor ID:</span>
-                        <span className="ml-1 font-mono font-medium">{doctor.doctorId}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => handleDeleteDoctor(doctor.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {filteredDoctors.length === 0 && (
+                <div className="text-center py-12 px-4">
+                  <UserCheck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-1">No doctors found</h3>
+                  <p className="text-gray-500">Try adjusting your search or filters</p>
+                </div>
+              )}
             </div>
 
             {filteredDoctors.length === 0 && (

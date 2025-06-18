@@ -34,15 +34,6 @@ interface Doctor {
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [newAppointment, setNewAppointment] = useState({
-    patientId: "",
-    doctorId: "",
-    date: "",
-    time: "",
-    symptoms: [] as string[],
-    status: "scheduled",
-    priority: "routine"
-  })
   const [searchQuery, setSearchQuery] = useState("")
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const { toast } = useToast()
@@ -97,20 +88,21 @@ export default function AppointmentsPage() {
     return str.toLowerCase().includes(search.toLowerCase());
   };
 
-  // Update filteredAppointments logic
+  // Filter appointments based on search query
   const filteredAppointments = appointments.filter((appointment) => {
+    if (!searchQuery) return true;
     if (!appointment) return false;
     
     const query = searchQuery.toLowerCase();
     
     return (
-      safeStringIncludes(appointment?.patientName, query) ||
-      safeStringIncludes(appointment?.doctorName, query) ||
-      appointment?.symptoms?.some(symptom => 
+      safeStringIncludes(appointment.patientName, query) ||
+      safeStringIncludes(appointment.doctorName, query) ||
+      (appointment.symptoms || []).some(symptom => 
         symptom && safeStringIncludes(symptom, query)
-      ) || false
+      )
     );
-  })
+  });
 
   const handleCreateSuccess = () => {
     setIsCreateModalOpen(false)
@@ -119,27 +111,6 @@ export default function AppointmentsPage() {
       description: "Appointment created successfully"
     })
   }
-
-  // Also update the search filter in the main component
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value || "";
-    setSearchQuery(query);
-    
-    const filtered = appointments.filter((appointment) => {
-      if (!appointment) return false;
-      
-      const searchLower = query.toLowerCase();
-      return (
-        safeStringIncludes(appointment?.patientName, searchLower) ||
-        safeStringIncludes(appointment?.doctorName, searchLower) ||
-        appointment?.symptoms?.some(symptom => 
-          symptom && safeStringIncludes(symptom, searchLower)
-        )
-      );
-    });
-    
-    setFilteredAppointments(filtered);
-  };
 
   return (
     <MainLayout title="Appointments" subtitle="Manage and track all appointments">
@@ -169,8 +140,8 @@ export default function AppointmentsPage() {
 
         {/* Appointments List */}
         <AppointmentsList 
-          appointments={filteredAppointments} 
-          onSearch={setSearchQuery} 
+          appointments={filteredAppointments || []}
+          onSearch={setSearchQuery}
         />
       </div>
     </MainLayout>

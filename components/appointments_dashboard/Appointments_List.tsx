@@ -50,11 +50,14 @@ interface Appointment {
 }
 
 interface AppointmentsListProps {
-  appointments: Appointment[]
+  appointments?: Appointment[] // Make appointments optional
   onSearch: (query: string) => void
 }
 
-export default function AppointmentsList({ appointments, onSearch }: AppointmentsListProps) {
+export default function AppointmentsList({ 
+  appointments = [], // Default to empty array
+  onSearch 
+}: AppointmentsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const { toast } = useToast()
@@ -121,8 +124,10 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
     }
   }
 
-  // Update filteredAppointments logic
-  const filteredAppointments = appointments.filter(appointment => {
+  // Update filteredAppointments logic with null checks
+  const filteredAppointments = (appointments || []).filter(appointment => {
+    if (!appointment) return false
+    
     // Status filtering
     if (statusFilter !== "all" && appointment.status !== statusFilter) return false
 
@@ -132,9 +137,9 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
     // Search filtering
     if (searchQuery) {
       if (searchType === "patient") {
-        return appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase())
+        return appointment.patientName?.toLowerCase().includes(searchQuery.toLowerCase())
       } else {
-        return appointment.doctorName.toLowerCase().includes(searchQuery.toLowerCase())
+        return appointment.doctorName?.toLowerCase().includes(searchQuery.toLowerCase())
       }
     }
 
@@ -375,110 +380,115 @@ export default function AppointmentsList({ appointments, onSearch }: Appointment
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentAppointments.map((appointment, index) => (
-              <TableRow key={appointment.id} className="text-gray-800 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <TableCell className="py-3">{startIndex + index + 1}</TableCell>
-                <TableCell className="py-3 font-medium">{appointment.patientId}</TableCell>
-                <TableCell className="py-3">{appointment.patientName} ({appointment.patientAge} years)</TableCell>
-                <TableCell className="py-3 capitalize">{appointment.gender}</TableCell>
-                <TableCell className="py-3">{appointment.mobileNumber}</TableCell>
-                <TableCell className="py-3">{appointment.doctorName}</TableCell>
-                <TableCell className="py-3">
-                  <span className="block text-sm font-medium">{new Date(appointment.date).toLocaleDateString()}</span>
-                  <span className="block text-xs text-gray-500">{appointment.time}</span>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {appointment.symptoms.map((symptom, i) => (
-                      <Badge key={i} variant="secondary" className="bg-blue-100 text-blue-800 px-2 py-0.5 text-xs rounded-full">
-                        {symptom}
+            {currentAppointments.length > 0 ? (
+              currentAppointments.map((appointment, index) => (
+                appointment && (
+                  <TableRow key={appointment.id} className="text-gray-800 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <TableCell className="py-3">{startIndex + index + 1}</TableCell>
+                    <TableCell className="py-3 font-medium">{appointment.patientId}</TableCell>
+                    <TableCell className="py-3">{appointment.patientName} ({appointment.patientAge} years)</TableCell>
+                    <TableCell className="py-3 capitalize">{appointment.gender}</TableCell>
+                    <TableCell className="py-3">{appointment.mobileNumber}</TableCell>
+                    <TableCell className="py-3">{appointment.doctorName}</TableCell>
+                    <TableCell className="py-3">
+                      <span className="block text-sm font-medium">{new Date(appointment.date).toLocaleDateString()}</span>
+                      <span className="block text-xs text-gray-500">{appointment.time}</span>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(appointment.symptoms || []).map((symptom, i) => (
+                          symptom && (
+                            <Badge key={i} variant="secondary" className="bg-blue-100 text-blue-800 px-2 py-0.5 text-xs rounded-full">
+                              {symptom}
+                            </Badge>
+                          )
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge
+                        variant={
+                          appointment.priority === "emergency"
+                            ? "destructive"
+                            : appointment.priority === "urgent"
+                            ? "default"
+                            : "secondary"
+                        }
+                        className={`${
+                          appointment.priority === "routine" ? "bg-green-100 text-green-800" :
+                          appointment.priority === "urgent" ? "bg-orange-100 text-orange-800" :
+                          "bg-red-100 text-red-800"
+                        } px-2 py-0.5 text-xs rounded-full capitalize`}
+                      >
+                        {appointment.priority}
                       </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <Badge
-                    variant={
-                      appointment.priority === "emergency"
-                        ? "destructive"
-                        : appointment.priority === "urgent"
-                        ? "default"
-                        : "secondary"
-                    }
-                    className={`${
-                      appointment.priority === "routine" ? "bg-green-100 text-green-800" :
-                      appointment.priority === "urgent" ? "bg-orange-100 text-orange-800" :
-                      "bg-red-100 text-red-800"
-                    } px-2 py-0.5 text-xs rounded-full capitalize`}
-                  >
-                    {appointment.priority}
-                  </Badge>
-                </TableCell>
-                <TableCell className="py-3">
-                  <Badge
-                    variant={
-                      appointment.status === "completed"
-                        ? "default"
-                        : appointment.status === "cancelled"
-                        ? "destructive"
-                        : appointment.status === "in-progress"
-                        ? "secondary"
-                        : "outline"
-                    }
-                    className={`${
-                      appointment.status === "scheduled" ? "bg-blue-110 text-blue-800" :
-                      appointment.status === "in-progress" ? "bg-yellow-100 text-yellow-800" :
-                      appointment.status === "completed" ? "bg-green-100 text-green-800" :
-                      "bg-red-100 text-red-800"
-                    } px-2 py-0.5 text-xs rounded-full capitalize`}
-                  >
-                    {appointment.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="flex gap-2 items-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleStatusUpdate(appointment.id, "cancelled")}
-                      disabled={appointment.status === "completed" || appointment.status === "cancelled"}
-                      className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700 px-3 py-1 h-auto"
-                    >
-                      Cancel
-                    </Button>
-                    {userRole === "admin" && (
-                      <>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Appointment Actions</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleStatusUpdate(appointment.id, "in-progress")}>
-                              Mark In-Progress
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusUpdate(appointment.id, "completed")}>
-                              Mark Completed
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge
+                        variant={
+                          appointment.status === "completed"
+                            ? "default"
+                            : appointment.status === "cancelled"
+                            ? "destructive"
+                            : appointment.status === "in-progress"
+                            ? "secondary"
+                            : "outline"
+                        }
+                        className={`${
+                          appointment.status === "scheduled" ? "bg-blue-110 text-blue-800" :
+                          appointment.status === "in-progress" ? "bg-yellow-100 text-yellow-800" :
+                          appointment.status === "completed" ? "bg-green-100 text-green-800" :
+                          "bg-red-100 text-red-800"
+                        } px-2 py-0.5 text-xs rounded-full capitalize`}
+                      >
+                        {appointment.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex gap-2 items-center">
                         <Button
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteAppointment(appointment.id)}
-                          className="px-3 py-1 h-auto"
+                          onClick={() => handleStatusUpdate(appointment.id, "cancelled")}
+                          disabled={appointment.status === "completed" || appointment.status === "cancelled"}
+                          className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700 px-3 py-1 h-auto"
                         >
-                          Delete
+                          Cancel
                         </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {currentAppointments.length === 0 && ( /* Handle no appointments found */
+                        {userRole === "admin" && (
+                          <>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Appointment Actions</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleStatusUpdate(appointment.id, "in-progress")}>
+                                  Mark In-Progress
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusUpdate(appointment.id, "completed")}>
+                                  Mark Completed
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteAppointment(appointment.id)}
+                              className="px-3 py-1 h-auto"
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              )) 
+            ) : (
               <TableRow>
                 <TableCell colSpan={11} className="h-24 text-center text-gray-500">
                   No appointments found for the current filters.

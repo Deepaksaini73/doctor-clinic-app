@@ -12,6 +12,23 @@ import { ref, onValue, get } from "firebase/database"
 import { useToast } from "@/hooks/use-toast"
 import { Calendar, Users, Clock } from "lucide-react"
 
+const getAppointmentStats = (appointments: Appointment[]) => {
+  const completed = appointments.filter(apt => apt.status === "completed").length;
+  const inProgress = appointments.filter(apt => apt.status === "in-progress").length;
+  const pending = appointments.filter(apt => apt.status === "scheduled").length;
+  const total = appointments.length;
+  
+  const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  
+  return {
+    total,
+    completed,
+    inProgress,
+    pending,
+    completionPercentage
+  };
+};
+
 export default function DoctorDashboardPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [patient, setPatient] = useState<Patient | null>(null)
@@ -164,13 +181,60 @@ export default function DoctorDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-white border-doctor border-t-4 shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <Users className="h-6 w-6 text-blue-600" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <Users className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Today's Patients</p>
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        {getAppointmentStats(appointments).total}
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-600">Completed</p>
+                    <p className="text-lg font-semibold text-green-600">
+                      {getAppointmentStats(appointments).completionPercentage}%
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Today's Patients</p>
-                  <h3 className="text-2xl font-bold text-gray-900">{appointments.length}</h3>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Progress</span>
+                    <span>{getAppointmentStats(appointments).completed}/{getAppointmentStats(appointments).total}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green-500 transition-all duration-500" 
+                      style={{ 
+                        width: `${getAppointmentStats(appointments).completionPercentage}%` 
+                      }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center">
+                      <span className="text-blue-600 font-medium">
+                        {getAppointmentStats(appointments).pending}
+                      </span>
+                      <p className="text-gray-600">Pending</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-yellow-600 font-medium">
+                        {getAppointmentStats(appointments).inProgress}
+                      </span>
+                      <p className="text-gray-600">In Progress</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-green-600 font-medium">
+                        {getAppointmentStats(appointments).completed}
+                      </span>
+                      <p className="text-gray-600">Completed</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

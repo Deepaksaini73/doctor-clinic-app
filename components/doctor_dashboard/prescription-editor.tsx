@@ -83,7 +83,6 @@ export default function PrescriptionEditor({
   }, [appointment])
 
   const handleGetAISuggestions = async () => {
-    // Add null check and length validation
     if (!symptoms?.length) {
       toast({
         title: "No symptoms",
@@ -95,45 +94,164 @@ export default function PrescriptionEditor({
     setIsSuggesting(true);
 
     try {
-      console.log("Sending symptoms to API:", symptoms);
-      const response = await fetch("/api/medicines", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          symptoms: symptoms.map(s => s.trim())
-        }),
-      });
+      // Track suggestions for each symptom
+      const symptomSuggestions = new Map<string, any>();
+      let hasAnyExistingData = false;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("API Error Response:", errorData);
-        throw new Error(errorData.error || "Failed to get AI suggestions");
+      // Check database for each symptom
+      for (const symptom of symptoms) {
+        const symptomRef = ref(database, `symptoms_medicines/${symptom}`);
+        const snapshot = await get(symptomRef);
+        
+        if (snapshot.exists()) {
+          hasAnyExistingData = true;
+          symptomSuggestions.set(symptom, snapshot.val());
+        }
       }
 
-      const data = await response.json();
-      console.log("Received data from API:", data);
-
-      if (!data.diagnosis || !Array.isArray(data.medicines)) {
-        throw new Error("Invalid response format from API");
+      // Get doctor-specific prescriptions
+      let doctorSpecificMeds = [];
+      if (appointment?.doctorId) {
+        const doctorPrescriptionsRef = ref(
+          database, 
+          `doctors_prescriptions/${appointment.doctorId}`
+        );
+        const doctorSnapshot = await get(doctorPrescriptionsRef);
+        if (doctorSnapshot.exists()) {
+          const doctorData = doctorSnapshot.val();
+          symptoms.forEach(symptom => {
+            if (doctorData[symptom]?.medicines) {
+              doctorSpecificMeds.push(...doctorData[symptom].medicines);
+            }
+          });
+        }
       }
 
-      // Update both diagnosis and medicines
-      setDiagnosis(data.diagnosis);
-      setMedicines(data.medicines);
-      setInstructions("");
-      setFollowUp("");
+      if (hasAnyExistingData || doctorSpecificMeds.length > 0) {
+        // Create weighted medicine scores
+        const medicineScores = new Map<string, {
+          medicine: Medicine,
+          score: number,
+          symptoms: Set<string>
+        }>();
 
-      toast({
-        title: "AI Suggestions Generated",
-        description: "Diagnosis and prescription suggestions have been generated based on symptoms.",
-      });
+        // Process existing prescriptions for each symptom
+        symptomSuggestions.forEach((medicines, symptom) => {
+          Object.values(medicines).forEach((med: any) => {
+            const key = med.name.toLowerCase();
+            if (!medicineScores.has(key)) {
+              medicineScores.set(key, {
+                medicine: {
+                  name: med.name,
+                  dosage: med.dosage,
+                  frequency: med.frequency,
+                  duration: med.duration,
+                  notes: ""
+                },
+                score: med.count || 1,
+                symptoms: new Set([symptom])
+              });
+            } else {
+              const existing = medicineScores.get(key)!;
+              existing.score += med.count || 1;
+              existing.symptoms.add(symptom);
+            }
+          });
+        });
+
+        // Add doctor-specific medicines with higher weight
+        doctorSpecificMeds.forEach(prescription => {
+          prescription.medicines.forEach(med => {
+            const key = med.name.toLowerCase();
+            if (!medicineScores.has(key)) {
+              medicineScores.set(key, {
+                medicine: med,
+                score: 2,
+                symptoms: new Set()
+              });
+            } else {
+              const existing = medicineScores.get(key)!;
+              existing.score += 2;
+            }
+          });
+        });
+
+        // Sort medicines by score and symptom coverage
+        const sortedMedicines = Array.from(medicineScores.values())
+          .sort((a, b) => {
+            // Prioritize medicines that cover multiple symptoms
+            const symptomDiff = b.symptoms.size - a.symptoms.size;
+            if (symptomDiff !== 0) return symptomDiff;
+            // Then by score
+            return b.score - a.score;
+          })
+          .slice(0, 5) // Take top 5
+          .map(({ medicine }) => medicine);
+
+        // Generate diagnosis based on covered symptoms
+        const coveredSymptoms = new Set<string>();
+        medicineScores.forEach(({ symptoms }) => {
+          symptoms.forEach(s => coveredSymptoms.add(s));
+        });
+
+        let diagnosisText = "Based on analysis of symptoms:\n";
+        symptoms.forEach(symptom => {
+          diagnosisText += `- ${symptom}: ${coveredSymptoms.has(symptom) ? 
+            "Found common treatments" : 
+            "New symptom pattern"}\n`;
+        });
+
+        // Update state with suggested medicines
+        setDiagnosis(diagnosisText);
+        setMedicines(sortedMedicines);
+
+        // If some symptoms weren't found in database, call AI API
+        const uncoveredSymptoms = symptoms.filter(s => !coveredSymptoms.has(s));
+        if (uncoveredSymptoms.length > 0) {
+          const aiResponse = await fetch("/api/medicines", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ symptoms: uncoveredSymptoms })
+          });
+
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            // Append AI suggestions to existing medicines
+            setMedicines(prev => [...prev, ...aiData.medicines]);
+            setDiagnosis(prev => `${prev}\n\nAI Suggestions for new symptoms:\n${aiData.diagnosis}`);
+          }
+        }
+
+        toast({
+          title: "Suggestions Generated",
+          description: `Combined ${coveredSymptoms.size} known patterns${
+            uncoveredSymptoms.length ? " with AI suggestions" : ""
+          }`,
+        });
+      } else {
+        // No existing data, use AI for all symptoms
+        const response = await fetch("/api/medicines", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symptoms })
+        });
+
+        if (!response.ok) throw new Error("Failed to get AI suggestions");
+
+        const data = await response.json();
+        setDiagnosis(data.diagnosis);
+        setMedicines(data.medicines);
+
+        toast({
+          title: "AI Suggestions Generated",
+          description: "Using AI model as no previous prescriptions found",
+        });
+      }
     } catch (error) {
-      console.error("Error getting AI suggestions:", error);
+      console.error("Error getting suggestions:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get AI suggestions. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to get suggestions",
         variant: "destructive",
       });
     } finally {
@@ -237,6 +355,7 @@ export default function PrescriptionEditor({
         date: new Date().toISOString(),
         doctorId: appointment.doctorId,
         doctorName: appointment.doctorName,
+        doctorAge: appointment.patientAge,
         diagnosis: diagnosis,
         medicines: medicines.map(medicine => ({
           name: medicine.name,
@@ -291,9 +410,84 @@ export default function PrescriptionEditor({
         }
       }
 
+      const updateSymptomMedicineData = async () => {
+        try {
+          // Get symptoms from the appointment
+          const currentSymptoms = symptoms || [];
+          
+          // Reference to symptoms-medicines mapping
+          const symptomsMedicinesRef = ref(database, 'symptoms_medicines');
+          
+          // For each symptom, update medicine frequencies
+          for (const symptom of currentSymptoms) {
+            const symptomRef = ref(database, `symptoms_medicines/${symptom}`);
+            const symptomSnapshot = await get(symptomRef);
+            const existingData = symptomSnapshot.exists() ? symptomSnapshot.val() : {};
+            
+            // Update frequencies for each medicine
+            for (const medicine of medicines) {
+              const medicineKey = medicine.name.toLowerCase().replace(/\s+/g, '_');
+              existingData[medicineKey] = {
+                name: medicine.name,
+                dosage: medicine.dosage,
+                frequency: medicine.frequency,
+                duration: medicine.duration,
+                count: (existingData[medicineKey]?.count || 0) + 1
+              };
+            }
+            
+            // Save updated data
+            await set(symptomRef, existingData);
+          }
+          
+          // Save doctor-specific prescriptions
+          const doctorPrescriptionsRef = ref(
+            database, 
+            `doctors_prescriptions/${appointment.doctorId}`
+          );
+          
+          const doctorSnapshot = await get(doctorPrescriptionsRef);
+          const doctorPrescriptions = doctorSnapshot.exists() 
+            ? doctorSnapshot.val() 
+            : {};
+          
+          // Update for each symptom
+          for (const symptom of currentSymptoms) {
+            if (!doctorPrescriptions[symptom]) {
+              doctorPrescriptions[symptom] = { medicines: [] };
+            }
+            
+            // Add new prescription data
+            doctorPrescriptions[symptom].medicines.push({
+              diagnosis: diagnosis,
+              medicines: medicines,
+              date: new Date().toISOString(),
+              patientId: appointment.patientId,
+              prescriptionId: prescriptionData.id
+            });
+            
+            // Keep only last 10 prescriptions per symptom
+            if (doctorPrescriptions[symptom].medicines.length > 10) {
+              doctorPrescriptions[symptom].medicines = 
+                doctorPrescriptions[symptom].medicines.slice(-10);
+            }
+          }
+          
+          // Save doctor's prescription history
+          await set(doctorPrescriptionsRef, doctorPrescriptions);
+
+        } catch (error) {
+          console.error("Error updating symptom-medicine data:", error);
+          throw error;
+        }
+      };
+
+      // Update symptom-medicine relationships
+      await updateSymptomMedicineData();
+      
       toast({
         title: "Prescription Saved",
-        description: prescriptionId ? "Prescription has been updated successfully." : "Prescription has been saved successfully.",
+        description: "Prescription and symptom data have been saved successfully.",
       })
       
       // Reset states
