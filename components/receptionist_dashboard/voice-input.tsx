@@ -1,126 +1,185 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Mic, MicOff, Trash2, Save, Play } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Mic, MicOff, Trash2, Save, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { APPOINTMENT_SYSTEM_PROMPT } from "@/lib/prompt-service";
 
 interface VoiceInputProps {
-  onTranscriptComplete: (transcript: string) => void
+  onTranscriptComplete: (processedData: any) => void;
 }
 
 export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
-  const [isListening, setIsListening] = useState(false)
-  const [transcript, setTranscript] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const recognitionRef = useRef<any>(null)
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [transcript, setTranscript] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    // Check if browser supports SpeechRecognition
-    if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
-      recognitionRef.current.continuous = true
-      recognitionRef.current.interimResults = true
+    if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
 
-      recognitionRef.current.onresult = (event: any) => {
-        let interimTranscript = ""
-        let finalTranscript = ""
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
 
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript
+      let finalTranscript = "";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setError(null);
+        finalTranscript = ""; // Reset final transcript when starting new recording
+      };
+
+      recognition.onerror = (e: any) => {
+        console.error("Speech recognition error:", e);
+        setError("Error recording voice. Please try again.");
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = "";
+        
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcriptPiece = event.results[i][0].transcript || "";
           if (event.results[i].isFinal) {
-            finalTranscript += transcript + " "
+            finalTranscript += transcriptPiece + " ";
           } else {
-            interimTranscript += transcript
+            interimTranscript += transcriptPiece;
           }
         }
+        
+        const currentTranscript = (finalTranscript + interimTranscript).trim();
+        setTranscript(currentTranscript || "");
+      };
 
-        setTranscript((prevTranscript) => prevTranscript + finalTranscript)
-      }
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error)
-        setError(`Error: ${event.error}`)
-        setIsListening(false)
-      }
-
-      recognitionRef.current.onend = () => {
-        if (isListening) {
-          recognitionRef.current.start()
+      return () => {
+        if (recognition) {
+          recognition.stop();
         }
-      }
+      };
     } else {
-      setError("Speech recognition is not supported in this browser. Please use Chrome or Edge.")
+      setError(
+        "Speech recognition is not supported in this browser. Please use Chrome."
+      );
     }
+  }, []);
 
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
+  const startRecording = () => {
+    try {
+      if (recognitionRef.current && !isListening) {
+        setTranscript(""); // Clear transcript when starting new recording
+        recognitionRef.current.start();
       }
+    } catch (err) {
+      console.error("Error starting recording:", err);
+      setError("Failed to start recording. Please try again.");
+      setIsListening(false);
     }
-  }, [isListening])
+  };
+
+  const stopRecording = () => {
+    try {
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
+      }
+    } catch (err) {
+      console.error("Error stopping recording:", err);
+      setError("Failed to stop recording. Please refresh the page.");
+    }
+  };
 
   const toggleListening = () => {
     if (isListening) {
-      recognitionRef.current?.stop()
-      setIsListening(false)
+      stopRecording();
     } else {
-      setError(null)
-      try {
-        recognitionRef.current?.start()
-        setIsListening(true)
-      } catch (err) {
-        console.error("Failed to start speech recognition:", err)
-        setError("Failed to start speech recognition. Please try again.")
-      }
+      startRecording();
     }
-  }
+  };
 
   const handleClearTranscript = () => {
-    setTranscript("")
+    setTranscript("");
+    setError(null);
+  };
+
+  const processTranscript = async (text: string) => {
+  if (!text.trim()) {
+    setError("Transcript is empty.");
+    return;
   }
+
+  setIsProcessing(true);
+  setError(null);
+
+  try {
+    console.log("Sending transcript:", text);
+
+    const response = await fetch("/api/process-voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: text }),
+    });
+
+    console.log("API status:", response.status);
+
+    const data = await response.json();
+    console.log("API response:", data);
+
+    if (!response.ok) {
+      throw new Error(data.error || `API returned status ${response.status}`);
+    }
+
+    // Validate required fields are present AND non-empty
+    const requiredFields = ["patientName", "patientAge", "gender", "symptoms", "priority"];
+    const missingFields = requiredFields.filter(field => {
+      const value = data[field];
+      return (
+        value === undefined || 
+        value === null || 
+        (typeof value === "string" && value.trim() === "")
+      );
+    });
+
+    if (missingFields.length > 0) {
+      throw new Error(`Missing or empty fields: ${missingFields.join(", ")}`);
+    }
+
+    if (typeof onTranscriptComplete === "function") {
+      onTranscriptComplete(data);
+    }
+
+  } catch (err) {
+    console.error("Transcript processing failed:", err);
+    const msg = err instanceof Error ? err.message : "Something went wrong";
+    setError(`${msg}. Please try again.`);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
 
   const handleSaveTranscript = () => {
-    onTranscriptComplete(transcript)
-  }
-
-  // Mock voice input for demo purposes
-  const simulateVoiceInput = () => {
-    const mockPhrases = [
-      "New appointment for John Smith, 45 years old, with severe headache and dizziness. He prefers Dr. Sarah Johnson.",
-      "Emily Johnson, 32 years old, is experiencing shortness of breath and wheezing. She wants to see Dr. Michael Chen urgently.",
-      "Robert Davis, 58, has been feeling fatigue and increased thirst. Schedule him with Dr. Lisa Wong.",
-    ]
-
-    const randomPhrase = mockPhrases[Math.floor(Math.random() * mockPhrases.length)]
-    setTranscript(randomPhrase)
-  }
-
-  // Voice command shortcuts (placeholder for future ML integration)
-  const processVoiceCommand = () => {
-    // This is where you would integrate with your ML voice processing system
-    // For now, we'll use a simple keyword detection system
-
-    const command = transcript.toLowerCase()
-
-    if (command.includes("new appointment") || command.includes("schedule appointment")) {
-      // Extract patient info and pre-fill form
-      onTranscriptComplete(transcript)
-      return
+    const trimmedTranscript = transcript.trim();
+    if (trimmedTranscript) {
+      processTranscript(trimmedTranscript);
     }
-
-    if (command.includes("urgent") || command.includes("emergency")) {
-      // Mark as urgent
-      onTranscriptComplete(transcript + " [URGENT]")
-      return
-    }
-
-    // Default behavior if no command detected
-    onTranscriptComplete(transcript)
-  }
+  };
 
   return (
     <Card className="w-full border-receptionist border-t-4">
@@ -132,14 +191,18 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
               variant={isListening ? "destructive" : "default"}
               size="sm"
               onClick={toggleListening}
-              className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-receptionist hover:bg-blue-700"}
+              className={
+                isListening
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "bg-receptionist hover:bg-blue-700"
+              }
             >
-              {isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
+              {isListening ? (
+                <MicOff className="mr-2 h-4 w-4" />
+              ) : (
+                <Mic className="mr-2 h-4 w-4" />
+              )}
               {isListening ? "Stop" : "Start"} Recording
-            </Button>
-            <Button variant="outline" size="sm" onClick={simulateVoiceInput}>
-              <Play className="mr-2 h-4 w-4" />
-              Simulate Voice
             </Button>
           </div>
         </CardTitle>
@@ -153,34 +216,43 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
         <Textarea
           placeholder="Speak or type patient information here..."
           className="min-h-[150px] text-lg"
-          value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
+          value={transcript || ""}
+          onChange={(e) => setTranscript(e.target.value || "")}
         />
         <div className="mt-2 text-sm text-gray-500">
-          <p>
-            <strong>Voice Command Examples:</strong> "New appointment for [name], [age], with [symptoms]" or "Urgent
-            appointment for [name]"
-          </p>
-          <p className="mt-1 text-xs italic">Note: This is a placeholder for future ML voice processing integration</p>
-        </div>
+  <p>
+    <strong>Instructions:</strong> Click "Start Recording" and speak clearly. Click "Stop Recording" when finished.
+  </p>
+  <p className="mt-1">
+    <strong>What to say:</strong> Include your name, age, gender, mobile number, symptoms, preferred doctor (if any), and how urgent it is.
+  </p>
+  <p className="mt-1">
+    <strong>Example:</strong> "Hi, my name is Ramesh Verma. I am forty two years old male. My number is nine eight seven six five four three two one zero. I have headache and mild fever. I want to see Dr. Anita Sharma urgently. I have a history of migraine."
+  </p>
+</div>
+
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button variant="outline" onClick={handleClearTranscript}>
           <Trash2 className="mr-2 h-4 w-4" /> Clear
         </Button>
-        <div className="space-x-2">
-          <Button variant="outline" onClick={processVoiceCommand}>
-            Process Command
-          </Button>
-          <Button
-            onClick={handleSaveTranscript}
-            disabled={!transcript.trim()}
-            className="bg-receptionist hover:bg-blue-700"
-          >
-            <Save className="mr-2 h-4 w-4" /> Use Transcript
-          </Button>
-        </div>
+        <Button
+          onClick={handleSaveTranscript}
+          disabled={!transcript.trim() || isProcessing}
+          className="bg-receptionist hover:bg-blue-700"
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" /> Use Transcript
+            </>
+          )}
+        </Button>
       </CardFooter>
     </Card>
-  )
+  );
 }
