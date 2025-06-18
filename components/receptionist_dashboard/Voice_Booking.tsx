@@ -15,6 +15,11 @@ export default function EnhancedVoiceBooking({ onAppointmentCreated }: EnhancedV
   const [transcript, setTranscript] = useState<string>("")
   const [showAppointmentForm, setShowAppointmentForm] = useState(false)
 
+  const handleTranscriptComplete = (processedData: any) => {
+    setTranscript(processedData)
+    setShowAppointmentForm(true)
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -33,7 +38,7 @@ export default function EnhancedVoiceBooking({ onAppointmentCreated }: EnhancedV
         </div>
       </CardHeader>
       <CardContent>
-        <VoiceInput onTranscriptChange={setTranscript} />
+        <VoiceInput onTranscriptComplete={handleTranscriptComplete} />
 
         {showAppointmentForm && (
           <div className="mt-6">
@@ -43,4 +48,4 @@ export default function EnhancedVoiceBooking({ onAppointmentCreated }: EnhancedV
       </CardContent>
     </Card>
   )
-} 
+}

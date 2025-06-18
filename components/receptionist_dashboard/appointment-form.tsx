@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Loader2, Search } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { database } from "@/lib/firebase"
-import { ref, push, get, set, query, orderByChild, equalTo } from "firebase/database"
+import { ref, push, get, set } from "firebase/database"
 
 const formSchema = z.object({
   patientId: z.string().optional(),
@@ -34,11 +34,6 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-interface AppointmentFormProps {
-  transcript?: string
-  onAppointmentCreated: () => void
-}
-
 interface Patient {
   patientId: string
   name: string
@@ -52,6 +47,22 @@ interface Patient {
     chronicConditions: string[]
     pastVisits: any[]
   }
+}
+
+interface TranscriptData {
+  patientName?: string;
+  patientAge?: number;
+  gender?: "male" | "female" | "other";
+  mobileNumber?: string;
+  symptoms?: string | string[];
+  doctorPreference?: string;
+  priority?: "routine" | "urgent" | "emergency";
+  notes?: string;
+}
+
+interface AppointmentFormProps {
+  transcript?: TranscriptData;
+  onAppointmentCreated: () => void;
 }
 
 export default function AppointmentForm({ transcript, onAppointmentCreated }: AppointmentFormProps) {
@@ -138,12 +149,6 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
             variant: "destructive",
           })
         }
-      } else {
-        toast({
-          title: "Not Found",
-          description: "No patients found in the database",
-          variant: "destructive",
-        })
       }
     } catch (error) {
       console.error("Error searching patient:", error)
@@ -158,70 +163,63 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
   }
 
   useEffect(() => {
-    if (transcript) {
-      // Parse transcript to extract patient information
-      // This is a simple implementation - in a real app, you'd use NLP
-      const extractPatientName = (text: string) => {
-        const nameMatch = text.match(/for\s+([A-Za-z\s]+),\s+\d+|for\s+([A-Za-z\s]+)\s+\d+|([A-Za-z\s]+),\s+\d+/)
-        if (nameMatch) {
-          return (nameMatch[1] || nameMatch[2] || nameMatch[3]).trim()
-        }
-        return ""
+  if (transcript && typeof transcript === 'object') {
+    const transcriptData = transcript as TranscriptData;
+    console.log('Received transcript data:', transcriptData);
+
+    try {
+      if (transcriptData.patientName) {
+        form.setValue("patientName", transcriptData.patientName.trim(), { shouldValidate: true });
       }
 
-      const extractAge = (text: string) => {
-        const ageMatch = text.match(/(\d+)\s+years?\s+old|(\d+)\s+year|age\s+(\d+)|(\d+)\s+years/)
-        if (ageMatch) {
-          return ageMatch[1] || ageMatch[2] || ageMatch[3] || ageMatch[4]
-        }
-        return ""
+      if (typeof transcriptData.patientAge === 'number') {
+        form.setValue("patientAge", transcriptData.patientAge, { shouldValidate: true });
       }
 
-      const extractSymptoms = (text: string) => {
-        const symptomsMatch = text.match(/with\s+([^.]+)(?=\.|$)/)
-        if (symptomsMatch) {
-          return symptomsMatch[1].trim()
-        }
-
-        // Alternative pattern
-        const experiencingMatch = text.match(/experiencing\s+([^.]+)(?=\.|$)/)
-        if (experiencingMatch) {
-          return experiencingMatch[1].trim()
-        }
-
-        return ""
+      if (transcriptData.gender) {
+        form.setValue("gender", transcriptData.gender);
       }
 
-      const extractDoctor = (text: string) => {
-        const doctorMatch = text.match(/Dr\.\s+([A-Za-z\s]+)/i)
-        if (doctorMatch && doctorMatch[1]) {
-          const doctorName = doctorMatch[1].trim()
-          const doctor = doctors.find((d) => d.name.includes(doctorName))
-          return doctor?.id || ""
+      if (transcriptData.mobileNumber) {
+        form.setValue("mobileNumber", transcriptData.mobileNumber.trim(), { shouldValidate: true });
+      }
+
+      if (transcriptData.symptoms) {
+        const symptomsText = Array.isArray(transcriptData.symptoms) 
+          ? transcriptData.symptoms.join(", ")
+          : transcriptData.symptoms;
+        form.setValue("symptoms", symptomsText, { shouldValidate: true });
+      }
+
+      if (transcriptData.doctorPreference && doctors.length) {
+        const matchedDoctor = doctors.find(d =>
+          d.name.toLowerCase().includes(transcriptData.doctorPreference!.toLowerCase())
+        );
+        if (matchedDoctor) {
+          form.setValue("doctorId", matchedDoctor.id, { shouldValidate: true });
         }
-        return ""
       }
 
-      const extractPriority = (text: string) => {
-        if (text.toLowerCase().includes("urgent")) return "urgent"
-        if (text.toLowerCase().includes("emergency")) return "emergency"
-        return "routine"
+      if (transcriptData.priority) {
+        form.setValue("priority", transcriptData.priority, { shouldValidate: true });
       }
 
-      // Update form with extracted data
-      form.setValue("patientName", extractPatientName(transcript))
+      if (transcriptData.notes) {
+        form.setValue("notes", transcriptData.notes.trim(), { shouldValidate: true });
+      }
 
-      const age = extractAge(transcript)
-      if (age) form.setValue("patientAge", Number.parseInt(age))
+      form.trigger();
 
-      form.setValue("symptoms", extractSymptoms(transcript))
-
-      const doctorId = extractDoctor(transcript)
-      if (doctorId) form.setValue("doctorId", doctorId)
-
-      form.setValue("priority", extractPriority(transcript))
+    } catch (error) {
+      console.error('Error processing transcript data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process voice input data",
+        variant: "destructive",
+      });
     }
-  }, [transcript, doctors, form])
+  }
+}, [transcript, doctors, form, toast]);
 
   const onSubmit = async (data: FormValues) => {
     setIsLoading(true)
@@ -244,8 +242,6 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
           age: data.patientAge,
           gender: data.gender,
           contact: data.mobileNumber,
-          email: "", // You might want to add email field to the form
-          address: "", // You might want to add address field to the form
           medicalHistory: {
             allergies: [],
             chronicConditions: [],
