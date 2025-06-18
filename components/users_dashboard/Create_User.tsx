@@ -67,22 +67,28 @@ export default function CreateUser({
         variant: "destructive",
       })
   }
-const id = crypto.randomUUID();
 
-const generateUserId = (role: string) => {
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  switch (role.toLowerCase()) {
-    case "doctor":
-      return `DOC-${timestamp}${random}`;
-    case "receptionist":
-      return `RESP-${timestamp}${random}`;
-    case "admin":
-      return `AD-${timestamp}${random}`;
-    default:
-      return `USER-${timestamp}${random}`;
-  }
-};
+  const generateUUID = () => {
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 15);
+    return `${timestamp}-${randomStr}`;
+  };
+
+  const generateUserId = (role: string) => {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    switch (role.toLowerCase()) {
+      case "doctor":
+        return `DOC-${timestamp}${random}`;
+      case "receptionist":
+        return `RESP-${timestamp}${random}`;
+      case "admin":
+        return `AD-${timestamp}${random}`;
+      default:
+        return `USER-${timestamp}${random}`;
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

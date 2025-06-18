@@ -92,38 +92,41 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-md border">
-        <table className="min-w-full divide-y divide-gray-200">
+    <div className="space-y-4 overflow-hidden">
+      <div className="rounded-md border overflow-x-auto">
+        <table className="w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+              <th className="hidden sm:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-normal">
                   <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                  <div className="block sm:hidden text-xs text-gray-500 mt-1">
+                    {user.status} • {format(new Date(user.created), "MMM d, yyyy")}
+                  </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-normal">
                   <Badge className={getRoleBadgeColor(user.role)}>
                     {user.role}
                   </Badge>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="hidden sm:table-cell px-4 sm:px-6 py-4 whitespace-normal">
                   <Badge variant={user.status === "Active" ? "success" : "secondary"}>
                     {user.status}
                   </Badge>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="hidden md:table-cell px-4 sm:px-6 py-4 whitespace-normal text-sm text-gray-500">
                   {format(new Date(user.created), "MMM d, yyyy")}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-4 sm:px-6 py-4 whitespace-normal text-right text-sm font-medium">
                   <Button 
                     variant="ghost" 
                     size="sm"
