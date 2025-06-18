@@ -237,6 +237,7 @@ export default function PrescriptionEditor({
         date: new Date().toISOString(),
         doctorId: appointment.doctorId,
         doctorName: appointment.doctorName,
+        patientAge: appointment.patientAge,
         diagnosis: diagnosis,
         medicines: medicines.map(medicine => ({
           name: medicine.name,
@@ -336,8 +337,7 @@ const handleSearchMedicine = async (query: string) => {
   }
 };
 
-
-  const handleSelectMedicine = (medicine: Medicine) => {
+const handleSelectMedicine = (medicine: Medicine) => {
     setNewMedicine({
       ...newMedicine,
       name: medicine.name,
