@@ -1,48 +1,45 @@
 import { NextResponse } from "next/server"
-import { mockAppointments } from "@/lib/mock-data"
-import type { Appointment } from "@/lib/types"
+import { database } from "@/lib/firebase"
+import { ref, get, push, set } from "firebase/database"
 
-const appointments = [...mockAppointments]
+export async function GET() {
+  try {
+    const appointmentsRef = ref(database, 'appointments')
+    const snapshot = await get(appointmentsRef)
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const date = searchParams.get("date")
-  const doctorId = searchParams.get("doctorId")
+    if (!snapshot.exists()) {
+      return NextResponse.json({ appointments: [] })
+    }
 
-  let filteredAppointments = [...appointments]
+    const appointments = Object.entries(snapshot.val()).map(([id, data]) => ({
+      id,
+      ...data,
+    }))
 
-  if (date) {
-    filteredAppointments = filteredAppointments.filter((app) => app.date === date)
+    return NextResponse.json({ appointments })
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch appointments" },
+      { status: 500 }
+    )
   }
-
-  if (doctorId) {
-    filteredAppointments = filteredAppointments.filter((app) => app.doctorId === doctorId)
-  }
-
-  return NextResponse.json(filteredAppointments)
 }
 
 export async function POST(request: Request) {
   try {
-    const newAppointment: Appointment = await request.json()
+    const data = await request.json()
+    const appointmentsRef = ref(database, 'appointments')
+    const newAppointmentRef = push(appointmentsRef)
+    await set(newAppointmentRef, data)
 
-    // Generate a unique ID
-    newAppointment.id = `a${appointments.length + 1}`
-
-    // Set default status if not provided
-    if (!newAppointment.status) {
-      newAppointment.status = "scheduled"
-    }
-
-    // Set default priority if not provided
-    if (!newAppointment.priority) {
-      newAppointment.priority = "routine"
-    }
-
-    appointments.push(newAppointment)
-
-    return NextResponse.json(newAppointment, { status: 201 })
+    return NextResponse.json({ 
+      message: "Appointment created successfully",
+      id: newAppointmentRef.key
+    })
   } catch (error) {
-    return NextResponse.json({ error: "Failed to create appointment" }, { status: 400 })
+    return NextResponse.json(
+      { error: "Failed to create appointment" },
+      { status: 500 }
+    )
   }
 }

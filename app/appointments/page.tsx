@@ -6,8 +6,6 @@ import { Plus } from "lucide-react"
 import MainLayout from "@/components/layout/main-layout"
 import AppointmentsList from "@/components/appointments_dashboard/Appointments_List"
 import CreateAppointment from "@/components/appointments_dashboard/Create_Appointment"
-import { database } from "@/lib/firebase"
-import { ref, onValue } from "firebase/database"
 import { useToast } from "@/hooks/use-toast"
 
 
@@ -48,48 +46,52 @@ export default function AppointmentsPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const appointmentsRef = ref(database, 'appointments')
-    
-    const unsubscribe = onValue(appointmentsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const appointmentsData = snapshot.val()
-        const appointmentsArray = Object.entries(appointmentsData).map(([id, data]: [string, any]) => ({
-          id,
-          ...data
-        })) as Appointment[]
-        // Sort appointments by date and time
-        appointmentsArray.sort((a, b) => {
-          const dateA = new Date(`${a.date}T${a.time}`).getTime()
-          const dateB = new Date(`${b.date}T${b.time}`).getTime()
-          return dateA - dateB
+    const fetchAppointments = async () => {
+      try {
+        const response = await fetch('/api/appointments')
+        const data = await response.json()
+        
+        if (data.appointments) {
+          const sortedAppointments = data.appointments.sort((a: Appointment, b: Appointment) => {
+            const dateA = new Date(`${a.date}T${a.time}`).getTime()
+            const dateB = new Date(`${b.date}T${b.time}`).getTime()
+            return dateA - dateB
+          })
+          setAppointments(sortedAppointments)
+        }
+      } catch (error) {
+        console.error('Error fetching appointments:', error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch appointments",
+          variant: "destructive",
         })
-        setAppointments(appointmentsArray)
-      } else {
-        setAppointments([])
       }
-    })
+    }
 
-    return () => unsubscribe()
-  }, [])
+    fetchAppointments()
+  }, [toast])
 
   useEffect(() => {
-    const doctorsRef = ref(database, 'doctors')
-    
-    const unsubscribe = onValue(doctorsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const doctorsData = snapshot.val()
-        const doctorsArray = Object.entries(doctorsData).map(([id, data]: [string, any]) => ({
-          id,
-          ...data
-        })) as Doctor[]
-        setDoctors(doctorsArray)
-      } else {
-        setDoctors([])
+    const fetchDoctors = async () => {
+      try {
+        const response = await fetch('/api/doctors')
+        const data = await response.json()
+        if (data.doctors) {
+          setDoctors(data.doctors)
+        }
+      } catch (error) {
+        console.error('Error fetching doctors:', error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch doctors",
+          variant: "destructive",
+        })
       }
-    })
+    }
 
-    return () => unsubscribe()
-  }, [])
+    fetchDoctors()
+  }, [toast])
 
   // Add safe string comparison helper
   const safeStringIncludes = (str: string | undefined | null, search: string): boolean => {
