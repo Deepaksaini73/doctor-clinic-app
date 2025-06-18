@@ -28,6 +28,7 @@ interface CreateUserProps {
     role: string
     email: string
     password: string
+    userId?: string
   }
   onNewUserChange: (user: any) => void
   onCreateUser: () => void
@@ -45,16 +46,20 @@ export default function CreateUser({
   const [showPassword, setShowPassword] = useState(false)
   const [copyingPassword, setCopyingPassword] = useState(false)
   const [copyingEmail, setCopyingEmail] = useState(false)
-    const { toast } = useToast()
+  const [copyingUserId, setCopyingUserId] = useState(false)
+  const { toast } = useToast()
 
-  const handleCopy = async (text: string, type: 'email' | 'password') => {
+  const handleCopy = async (text: string, type: 'email' | 'password' | 'userId') => {
     await navigator.clipboard.writeText(text)
     if (type === 'password') {
       setCopyingPassword(true)
       setTimeout(() => setCopyingPassword(false), 2000)
-    } else {
+    } else if (type === 'email') {
       setCopyingEmail(true)
       setTimeout(() => setCopyingEmail(false), 2000)
+    } else {
+      setCopyingUserId(true)
+      setTimeout(() => setCopyingUserId(false), 2000)
     }
     toast({
         title: "Sucess",
@@ -62,6 +67,28 @@ export default function CreateUser({
         variant: "destructive",
       })
   }
+
+  const generateUUID = () => {
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 15);
+    return `${timestamp}-${randomStr}`;
+  };
+
+  const generateUserId = (role: string) => {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    switch (role.toLowerCase()) {
+      case "doctor":
+        return `DOC-${timestamp}${random}`;
+      case "receptionist":
+        return `RESP-${timestamp}${random}`;
+      case "admin":
+        return `AD-${timestamp}${random}`;
+      default:
+        return `USER-${timestamp}${random}`;
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -172,6 +199,26 @@ export default function CreateUser({
                 onClick={() => onGenerateCredentials(newUser.role)}
               >
                 <Lock className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-black">User ID</label>
+            <div className="flex space-x-2">
+              <Input
+                value={newUser.role ? generateUserId(newUser.role) : ''}
+                readOnly
+                placeholder="User ID will be generated"
+                className="text-black bg-gray-50"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="text-black"
+                onClick={() => handleCopy(generateUserId(newUser.role), 'userId')}
+              >
+                {copyingUserId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
           </div>

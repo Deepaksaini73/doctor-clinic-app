@@ -53,6 +53,21 @@ const CustomLabel = ({ cx, cy, midAngle, outerRadius, percent, name, fill }: any
   )
 }
 
+// Add this helper function after imports
+const safeGetHour = (time: string | undefined): string => {
+  if (!time) return "00";
+  try {
+    const hourMatch = time.match(/^(\d{1,2}):/);
+    if (hourMatch) {
+      return hourMatch[1].padStart(2, '0');
+    }
+    return "00";
+  } catch (error) {
+    console.error("Error parsing time:", error);
+    return "00";
+  }
+};
+
 export default function AnalyticsDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -122,14 +137,15 @@ export default function AnalyticsDashboard() {
 
   // Calculate time distribution from actual data
   const timeDistribution = appointments.reduce((acc: { [key: string]: number }, app) => {
-    const hour = app.time.split(':')[0] // Extract just the hour part
-    acc[hour] = (acc[hour] || 0) + 1
-    return acc
+    if (!app?.time) return acc;
+    const hour = safeGetHour(app.time);
+    acc[hour] = (acc[hour] || 0) + 1;
+    return acc;
   }, {})
 
   // Create array with all hours (0-23) and initialize with 0 if no appointments
   const timeDistributionArray = Array.from({ length: 24 }, (_, i) => {
-    const hour = i.toString().padStart(2, '0')
+    const hour = i.toString().padStart(2, '0');
     return {
       hour: `${hour}:00`,
       count: timeDistribution[hour] || 0

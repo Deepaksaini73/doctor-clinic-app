@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import LoginForm from "@/components/doctor_dashboard/login-form"
+import { Button } from "@/components/ui/button"
+import { LogIn } from "lucide-react"
 
 export default function AdminLoginPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -28,6 +29,12 @@ export default function AdminLoginPage() {
     }
   }, [router])
 
+  
+  const handleLoginClick = () => {
+    router.push("/login")
+  }
+
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
       <div className="w-full max-w-md">
@@ -36,7 +43,13 @@ export default function AdminLoginPage() {
           <p className="text-gray-600 dark:text-gray-400 mt-2">Sign in to access the admin dashboard</p>
         </div>
 
-        <LoginForm />
+          <Button
+            onClick={handleLoginClick}
+            className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2"
+          >
+            <LogIn className="h-5 w-5" />
+            Login to Your Account
+          </Button>
       </div>
     </div>
   )

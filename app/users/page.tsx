@@ -74,6 +74,22 @@ export default function UsersPage() {
     })
   }
 
+  // Add generateUserId function
+  const generateUserId = (role: string) => {
+    const timestamp = Date.now();
+    switch (role.toLowerCase()) {
+      case "doctor":
+        return `DOC${timestamp}`;
+      case "receptionist":
+        return `RESP${timestamp}`;
+      case "admin":
+        return `ADM${timestamp}`;
+      default:
+        return `USER${timestamp}`;
+    }
+  };
+
+  // Update handleCreateUser function
   const handleCreateUser = async () => {
     if (!newUser.name || !newUser.role || !newUser.email) {
       toast({
@@ -89,6 +105,7 @@ export default function UsersPage() {
       const newUserRef = push(usersRef)
       
       const userData = {
+        userId: generateUserId(newUser.role),
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,

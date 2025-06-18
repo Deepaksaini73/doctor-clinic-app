@@ -1,29 +1,60 @@
-# Next.js Project
+# CliniCare - Hospital Management System
 
-A modern web application built with Next.js 13+ and React.
+A comprehensive hospital management system built with Next.js 13+ and Firebase, designed to streamline healthcare workflows and improve patient care management.
 
-## 🚀 Features
+## 🌟 Core Features
 
-- Next.js 13+ with App Router
-- React 18
-- TypeScript
-- Tailwind CSS
-- ESLint & Prettier
-- Pre-commit hooks with Husky
-- API Routes
+### 👨‍⚕️ Doctor Portal
+- Real-time appointment dashboard
+- Patient medical history access
+- AI-powered prescription suggestions
+- Appointment status management
+- Patient records management
+
+### 👨‍💼 Admin Dashboard
+- User management (doctors, receptionists)
+- Real-time analytics dashboard
+- System monitoring
+- User activity tracking
+- Role-based access control
+
+### 👩‍💼 Receptionist Portal
+- Appointment scheduling
+- Patient registration
+- Queue management
+- Real-time updates
+- Patient search functionality
+
+### 👨‍👩‍👦 Patient Features
+- Medical history access
+- Appointment tracking
+- Prescription history
+- Profile management
+
+## 🚀 Technical Stack
+
+- **Frontend:** Next.js 13+ (App Router), React 18, TypeScript
+- **Styling:** Tailwind CSS, Shadcn UI
+- **Database:** Firebase Realtime Database
+- **Forms:** React Hook Form
+- **Date Handling:** date-fns
+- **State Management:** React Context
+- **Authentication:** Firebase Auth
+- **API:** Next.js API Routes
 
 ## 📦 Prerequisites
 
-- Node.js 16+ 
-- npm or yarn or pnpm
+- Node.js 16+
+- Firebase account
+- npm/yarn/pnpm
+- Git
 
-## 🛠️ Installation
+## ⚡ Quick Start
 
-1. Clone the repository:
+1. **Clone repository:**
 ```bash
-git clone https://github.com/yourusername/your-project-name.git
-cd your-project-name
-```
+git clone https://github.com/yourusername/clinicare.git
+cd clinicare
 
 2. Install dependencies:
 ```bash
@@ -36,7 +67,13 @@ pnpm install
 
 3. Create a `.env.local` file:
 ```bash
-cp .env.example .env.local
+NEXT_PUBLIC_FIREBASE_API_KEY=your_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=your_db_url
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 ```
 
 4. Start the development server:
@@ -53,15 +90,23 @@ Visit [http://localhost:3000](http://localhost:3000) to view your application.
 ## 📁 Project Structure
 
 ```
-├── app/                  # App router directory
-│   ├── layout.tsx       # Root layout
-│   └── page.tsx         # Home page
-├── components/          # React components
-├── public/             # Static assets
-├── styles/             # Global styles
-├── lib/                # Utility functions
-├── types/              # TypeScript types
-└── package.json        # Project dependencies
+├── app/
+│   ├── admin/              # Admin dashboard
+│   ├── doctor/             # Doctor portal
+│   ├── receptionist/       # Receptionist portal
+│   ├── api/               # API routes
+│   └── layout.tsx         # Root layout
+├── components/
+│   ├── admin_dashboard/    # Admin components
+│   ├── doctor_dashboard/   # Doctor components
+│   ├── patient_dashboard/  # Patient components
+│   ├── receptionist_dashboard/ # Receptionist components
+│   └── ui/                # Shared UI components
+├── lib/
+│   ├── firebase.ts        # Firebase config
+│   └── utils/             # Utility functions
+├── types/                 # TypeScript types
+└── styles/               # Global styles
 ```
 
 ## 📝 Available Scripts

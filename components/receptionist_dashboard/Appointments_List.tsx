@@ -16,12 +16,28 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { database } from "@/lib/firebase"
-import { ref, onValue, remove, update } from "firebase/database"
+import { ref, onValue, update } from "firebase/database"
 import { useToast } from "@/hooks/use-toast"
 
 interface EnhancedAppointmentsListProps {
   onAppointmentUpdated?: () => void
 }
+
+const isValidDate = (dateString: string | undefined | null): boolean => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date.getTime());
+};
+
+const isTodayDate = (dateString: string | undefined | null): boolean => {
+  if (!isValidDate(dateString)) return false;
+  try {
+    return isToday(parseISO(dateString));
+  } catch (error) {
+    console.error("Date parsing error:", error);
+    return false;
+  }
+};
 
 export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppointmentsListProps) {
   const [patientSearchQuery, setPatientSearchQuery] = useState("")
@@ -58,27 +74,6 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
     return () => unsubscribe()
   }, [])
 
-  const handleDeleteAppointment = async (appointmentId: string) => {
-    try {
-      const appointmentRef = ref(database, `appointments/${appointmentId}`)
-      await remove(appointmentRef)
-      toast({
-        title: "Success",
-        description: "Appointment deleted successfully",
-      })
-      if (onAppointmentUpdated) {
-        onAppointmentUpdated()
-      }
-    } catch (error) {
-      console.error("Error deleting appointment:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete appointment",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleStatusUpdate = async (appointmentId: string, newStatus: string) => {
     try {
       const appointmentRef = ref(database, `appointments/${appointmentId}`)
@@ -102,7 +97,11 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
 
   // Filter appointments based on all criteria
   const filteredAppointments = appointments
-    .filter(appointment => isToday(parseISO(appointment.date))) // Always filter for today
+    .filter(appointment => {
+      // Add null check and validation for date
+      if (!appointment?.date) return false;
+      return isTodayDate(appointment.date);
+    })
     .filter(appointment => {
       // Status filter
       if (statusFilter !== "all") {
@@ -303,14 +302,17 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteAppointment(appointment.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleStatusUpdate(appointment.id, 'cancelled')}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="ml-1">Cancel</span>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

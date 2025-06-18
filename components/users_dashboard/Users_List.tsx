@@ -9,18 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { database } from "@/lib/firebase"
@@ -29,6 +18,7 @@ import { useToast } from "@/hooks/use-toast"
 
 interface User {
   id: string
+  userId: string
   name: string
   email: string
   role: string
@@ -47,22 +37,22 @@ interface UsersListProps {
 export default function UsersList({ users, isLoading, onUserDeleted }: UsersListProps) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showPassword, setShowPassword] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [copyingPassword, setCopyingPassword] = useState(false)
   const [copyingEmail, setCopyingEmail] = useState(false)
+  const [copyingUserId, setCopyingUserId] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const { toast } = useToast()
 
-  const handleCopy = async (text: string, type: 'email' | 'password') => {
+  const handleCopy = async (text: string, type: 'email' | 'password' | 'userId') => {
     await navigator.clipboard.writeText(text)
-    if (type === 'password') {
-      setCopyingPassword(true)
-      setTimeout(() => setCopyingPassword(false), 2000)
-    } else {
-      setCopyingEmail(true)
-      setTimeout(() => setCopyingEmail(false), 2000)
+    const stateSetters = {
+      password: setCopyingPassword,
+      email: setCopyingEmail,
+      userId: setCopyingUserId
     }
+    stateSetters[type](true)
+    setTimeout(() => stateSetters[type](false), 2000)
     toast({
       title: "Copied!",
       description: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
@@ -74,19 +64,13 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
     try {
       const userRef = ref(database, `users/${userId}`)
       await remove(userRef)
-      
-      // Close both dialogs and reset states
-      setShowDeleteConfirm(false)
       setDialogOpen(false)
-      setSelectedUser(null)
       onUserDeleted()
-      
       toast({
         title: "Success",
         description: "User deleted successfully",
       })
     } catch (error) {
-      console.error('Error deleting user:', error)
       toast({
         title: "Error",
         description: "Failed to delete user",
@@ -94,6 +78,7 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
       })
     } finally {
       setIsDeleting(false)
+      setSelectedUser(null)
     }
   }
 
@@ -106,54 +91,49 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
     }
   }
 
-  const handleClose = () => {
-    setDialogOpen(false)
-    setSelectedUser(null)
-    setShowPassword(false)
-  }
-
-  const handleViewClick = (user: User) => {
-    setSelectedUser(user)
-    setDialogOpen(true)
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="rounded-md border">
-        <table className="min-w-full divide-y divide-gray-200">
+    <div className="space-y-4 overflow-hidden">
+      <div className="rounded-md border overflow-x-auto">
+        <table className="w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+              <th className="hidden sm:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-normal">
                   <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                  <div className="block sm:hidden text-xs text-gray-500 mt-1">
+                    {user.status} • {format(new Date(user.created), "MMM d, yyyy")}
+                  </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-normal">
                   <Badge className={getRoleBadgeColor(user.role)}>
                     {user.role}
                   </Badge>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="hidden sm:table-cell px-4 sm:px-6 py-4 whitespace-normal">
                   <Badge variant={user.status === "Active" ? "success" : "secondary"}>
                     {user.status}
                   </Badge>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="hidden md:table-cell px-4 sm:px-6 py-4 whitespace-normal text-sm text-gray-500">
                   {format(new Date(user.created), "MMM d, yyyy")}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-4 sm:px-6 py-4 whitespace-normal text-right text-sm font-medium">
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={() => handleViewClick(user)}
+                    onClick={() => {
+                      setSelectedUser(user);
+                      setDialogOpen(true);
+                    }}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -167,10 +147,10 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
       <Dialog 
         open={dialogOpen} 
         onOpenChange={(open) => {
-          setDialogOpen(open)
+          setDialogOpen(open);
           if (!open) {
-            setSelectedUser(null)
-            setShowPassword(false)
+            setShowPassword(false);
+            setSelectedUser(null);
           }
         }}
       >
@@ -201,7 +181,7 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
                 <p className="text-sm font-medium text-gray-500">Password</p>
                 <div className="flex items-center space-x-2">
                   <p className="text-sm flex-1 font-mono">
-                    {showPassword ? selectedUser.password : "••••••••"}
+                    {showPassword ? selectedUser.password : "•".repeat(8)}
                   </p>
                   <Button
                     size="sm"
@@ -213,7 +193,7 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowPassword(prev => !prev)}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -223,53 +203,40 @@ export default function UsersList({ users, isLoading, onUserDeleted }: UsersList
                 <p className="text-sm font-medium text-gray-500">Last Login</p>
                 <p className="text-sm">{selectedUser.lastLogin}</p>
               </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-500">User ID</p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm flex-1 font-mono">{selectedUser.userId}</p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleCopy(selectedUser.userId, 'userId')}
+                  >
+                    {copyingUserId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter className="sm:justify-between">
             <Button
               variant="destructive"
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={() => selectedUser && handleDelete(selectedUser.id)}
+              disabled={isDeleting || !selectedUser}
               className="mr-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete User
+              {isDeleting ? "Deleting..." : "Delete User"}
             </Button>
-            <Button variant="secondary" onClick={handleClose}>
+            <Button 
+              variant="secondary" 
+              onClick={() => setDialogOpen(false)}
+            >
               Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog 
-        open={showDeleteConfirm} 
-        onOpenChange={(open) => {
-          setShowDeleteConfirm(open)
-          if (!open) {
-            setIsDeleting(false)
-          }
-        }}
-      >
-        <AlertDialogContent className="sm:max-w-md text-black bg-white/95">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the user
-              account and remove their data from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => selectedUser && handleDelete(selectedUser.id)}
-              className="bg-red-600 hover:bg-red-700"
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

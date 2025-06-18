@@ -21,6 +21,7 @@ import { ref, onValue, push, remove, DataSnapshot, get, update } from "firebase/
 import { database } from "@/lib/firebase"
 import { Toaster } from "@/components/ui/toaster"
 
+// Update Doctor interface
 interface Doctor {
   id: string
   name: string
@@ -35,7 +36,30 @@ interface Doctor {
   }
   status: "active" | "inactive"
   joinDate: string
+  doctorId: string
 }
+
+const fetchDoctorIdByEmail = async (email: string) => {
+  try {
+    const usersRef = ref(database, 'users');
+    const snapshot = await get(usersRef);
+    
+    if (snapshot.exists()) {
+      const users = Object.values(snapshot.val());
+      const doctor = users.find((user: any) => 
+        user.email === email && user.role === 'doctor'
+      );
+      
+      if (doctor) {
+        return doctor.userId;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching doctor ID:', error);
+    return null;
+  }
+};
 
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -67,7 +91,8 @@ export default function DoctorsPage() {
     availableTime: {
       start: "",
       end: ""
-    }
+    },
+    doctorId: "" // Initialize as empty string instead of generating
   };
   const [newDoctor, setNewDoctor] = useState(emptyDoctor);
 
@@ -114,10 +139,10 @@ export default function DoctorsPage() {
   })
 
   const handleAddOrUpdateDoctor = async () => {
-    if (!newDoctor.name || !newDoctor.email || !newDoctor.specialization) {
+    if (!newDoctor.name || !newDoctor.email || !newDoctor.specialization || !newDoctor.doctorId) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields and ensure doctor email exists in users",
         variant: "destructive",
       })
       return
@@ -136,6 +161,7 @@ export default function DoctorsPage() {
       },
       status: "active",
       joinDate: new Date().toISOString().split("T")[0],
+      doctorId: newDoctor.doctorId,
     };
 
     try {
@@ -207,17 +233,14 @@ export default function DoctorsPage() {
   const handleEditDoctor = (doctor: Doctor) => {
     setIsEditMode(true);
     setNewDoctor({
-      name: doctor.name,
-      email: doctor.email,
-      specialization: doctor.specialization,
-      phone: doctor.phone,
-      experience: doctor.experience.toString(),
-      qualification: doctor.qualification,
-      availableDays: doctor.availability.days,
+      ...emptyDoctor, // Start with empty state
+      ...doctor, // Spread doctor data
+      availableDays: doctor.availability?.days || [],
       availableTime: {
-        start: doctor.availability.hours.split(" - ")[0],
-        end: doctor.availability.hours.split(" - ")[1]
-      }
+        start: doctor.availability?.hours?.split(" - ")[0] || "",
+        end: doctor.availability?.hours?.split(" - ")[1] || "",
+      },
+      experience: doctor.experience?.toString() || "",
     });
     setIsAddDialogOpen(true);
   };
@@ -289,13 +312,60 @@ export default function DoctorsPage() {
                         />
                       </div>
                       <div>
+                        <Label htmlFor="doctorId">Doctor ID</Label>
+                        <Input
+                          id="doctorId"
+                          value={newDoctor.doctorId || ''} // Add fallback empty string
+                          readOnly
+                          className="bg-gray-50"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
                         <Label htmlFor="email">Email *</Label>
                         <Input
                           id="email"
                           type="email"
-                          value={newDoctor.email}
-                          onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
+                          value={newDoctor.email || ''} // Add fallback empty string
+                          onChange={async (e) => {
+                            const email = e.target.value;
+                            setNewDoctor(prev => ({ ...prev, email })); // Update email first
+                            
+                            if (email && !isEditMode) {
+                              try {
+                                const doctorId = await fetchDoctorIdByEmail(email);
+                                if (doctorId) {
+                                  setNewDoctor(prev => ({ ...prev, doctorId }));
+                                } else {
+                                  toast({
+                                    title: "Warning",
+                                    description: "Doctor email not found in users database",
+                                    variant: "destructive",
+                                  });
+                                  setNewDoctor(prev => ({ ...prev, doctorId: "" })); // Reset doctorId if not found
+                                }
+                              } catch (error) {
+                                console.error("Error fetching doctor ID:", error);
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to fetch doctor ID",
+                                  variant: "destructive",
+                                });
+                              }
+                            }
+                          }}
                           placeholder="john.doe@clinicare.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="phone">Phone</Label>
+                        <Input
+                          id="phone"
+                          value={newDoctor.phone}
+                          onChange={(e) => setNewDoctor({ ...newDoctor, phone: e.target.value })}
+                          placeholder="+91 9667737373"
                         />
                       </div>
                     </div>
@@ -317,18 +387,6 @@ export default function DoctorsPage() {
                         </Select>
                       </div>
                       <div>
-                        <Label htmlFor="phone">Phone</Label>
-                        <Input
-                          id="phone"
-                          value={newDoctor.phone}
-                          onChange={(e) => setNewDoctor({ ...newDoctor, phone: e.target.value })}
-                          placeholder="+91 9667737373"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
                         <Label htmlFor="experience">Experience (Years)</Label>
                         <Input
                           id="experience"
@@ -338,6 +396,9 @@ export default function DoctorsPage() {
                           placeholder="5"
                         />
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="qualification">Qualification</Label>
                         <Input
@@ -480,6 +541,7 @@ export default function DoctorsPage() {
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Experience</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Doctor ID</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -528,6 +590,7 @@ export default function DoctorsPage() {
                           </Button>
                         </div>
                       </td>
+                      <td className="py-3 px-4 text-sm font-mono">{doctor.doctorId}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -572,6 +635,13 @@ export default function DoctorsPage() {
                       <div>
                         <span className="text-gray-500">Phone:</span>
                         <span className="ml-1 font-medium">{doctor.phone}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
+                      <div>
+                        <span className="text-gray-500">Doctor ID:</span>
+                        <span className="ml-1 font-mono font-medium">{doctor.doctorId}</span>
                       </div>
                     </div>
 
