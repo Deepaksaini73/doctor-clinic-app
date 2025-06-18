@@ -24,18 +24,44 @@ interface Appointment {
   priority: "routine" | "urgent" | "emergency"
 }
 
+const getInitials = (name: string | undefined): string => {
+  if (!name) return "?"
+  const parts = name.split(" ")
+  return parts.length > 1 ? parts[1].charAt(0) : parts[0].charAt(0)
+}
+
+const getPriorityStyles = (priority: string) => {
+  switch (priority) {
+    case "emergency":
+      return {
+        bg: "bg-red-100",
+        text: "text-red-600",
+      }
+    case "urgent":
+      return {
+        bg: "bg-orange-100",
+        text: "text-orange-600",
+      }
+    default:
+      return {
+        bg: "bg-blue-100",
+        text: "text-blue-600",
+      }
+  }
+}
+
 export default function AppointmentList() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
-    const appointmentsRef = ref(database, 'appointments')
+    const appointmentsRef = ref(database, "appointments")
     onValue(appointmentsRef, (snapshot) => {
       if (snapshot.exists()) {
         const appointmentsData = Object.entries(snapshot.val()).map(([id, data]) => ({
           id,
-          ...(data as Omit<Appointment, 'id'>)
+          ...(data as Omit<Appointment, "id">),
         }))
         // Sort appointments by date and time
         appointmentsData.sort((a, b) => {
@@ -50,17 +76,6 @@ export default function AppointmentList() {
       setIsLoading(false)
     })
   }, [])
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "emergency":
-        return "red"
-      case "urgent":
-        return "orange"
-      default:
-        return "blue"
-    }
-  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -91,29 +106,35 @@ export default function AppointmentList() {
           ) : appointments.length === 0 ? (
             <div className="text-center py-4 text-gray-500">No appointments found</div>
           ) : (
-            appointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:shadow-md transition-all duration-200 hover:border-blue-300"
-              >
+            appointments.map((appointment) => {
+              const priorityStyles = getPriorityStyles(appointment.priority)
+
+              return (
                 <div
-                  className={`w-10 h-10 rounded-full bg-${getPriorityColor(appointment.priority)}-100 flex items-center justify-center`}
+                  key={appointment.id}
+                  className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:shadow-md transition-all duration-200 hover:border-blue-300"
                 >
-                  <span className={`text-${getPriorityColor(appointment.priority)}-600 font-medium text-sm`}>
-                    {appointment.doctorName.split(" ")[1]?.charAt(0)}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm truncate">{appointment.doctorName}</p>
-                    {getStatusBadge(appointment.status)}
+                  <div
+                    className={`w-10 h-10 rounded-full ${priorityStyles.bg} flex items-center justify-center`}
+                  >
+                    <span className={`${priorityStyles.text} font-medium text-sm`}>
+                      {getInitials(appointment.doctorName)}
+                    </span>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {appointment.date} • {appointment.time}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm truncate">
+                        {appointment.doctorName || "Unknown Doctor"}
+                      </p>
+                      {getStatusBadge(appointment.status)}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {appointment.date || "No date"} • {appointment.time || "No time"}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </EnhancedCardContent>

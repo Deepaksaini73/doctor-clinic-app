@@ -29,6 +29,11 @@ interface Appointment {
   createdAt: number
 }
 
+const safeStringIncludes = (text: string | undefined | null, search: string): boolean => {
+  if (!text) return false;
+  return text.toLowerCase().includes(search.toLowerCase());
+};
+
 export default function RecentPatients() {
   const [isLoading, setIsLoading] = useState(true)
   const [recentPatients, setRecentPatients] = useState<Appointment[]>([])
@@ -71,10 +76,14 @@ export default function RecentPatients() {
     }
   }
 
-  const filteredPatients = recentPatients.filter(appointment =>
-    appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    appointment.mobileNumber.includes(searchQuery)
-  )
+  const filteredPatients = recentPatients.filter(appointment => {
+    if (!appointment) return false;
+    
+    return (
+      safeStringIncludes(appointment?.patientName, searchQuery) ||
+      safeStringIncludes(appointment?.mobileNumber, searchQuery)
+    );
+  })
 
   // Calculate pagination
   const indexOfLastPatient = currentPage * patientsPerPage

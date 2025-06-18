@@ -25,6 +25,7 @@ export interface Visit {
 
 export interface Doctor {
   id: string
+  doctorId: string
   name: string
   specialization: string
   availability: {

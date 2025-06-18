@@ -23,6 +23,22 @@ interface EnhancedAppointmentsListProps {
   onAppointmentUpdated?: () => void
 }
 
+const isValidDate = (dateString: string | undefined | null): boolean => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date.getTime());
+};
+
+const isTodayDate = (dateString: string | undefined | null): boolean => {
+  if (!isValidDate(dateString)) return false;
+  try {
+    return isToday(parseISO(dateString));
+  } catch (error) {
+    console.error("Date parsing error:", error);
+    return false;
+  }
+};
+
 export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppointmentsListProps) {
   const [patientSearchQuery, setPatientSearchQuery] = useState("")
   const [doctorSearchQuery, setDoctorSearchQuery] = useState("")
@@ -102,7 +118,11 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
 
   // Filter appointments based on all criteria
   const filteredAppointments = appointments
-    .filter(appointment => isToday(parseISO(appointment.date))) // Always filter for today
+    .filter(appointment => {
+      // Add null check and validation for date
+      if (!appointment?.date) return false;
+      return isTodayDate(appointment.date);
+    })
     .filter(appointment => {
       // Status filter
       if (statusFilter !== "all") {

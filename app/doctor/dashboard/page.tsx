@@ -10,7 +10,6 @@ import PatientProfile from "@/components/doctor_dashboard/Patient_Profile"
 import { database } from "@/lib/firebase"
 import { ref, onValue, get } from "firebase/database"
 import { useToast } from "@/hooks/use-toast"
-import { Toaster } from "@/components/ui/toaster"
 import { Calendar, Users, Clock } from "lucide-react"
 
 export default function DoctorDashboardPage() {
@@ -19,39 +18,60 @@ export default function DoctorDashboardPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [doctorName, setDoctorName] = useState("")
+  const [doctorId, setDoctorId] = useState<string>("")
   const { toast } = useToast()
 
   // Fetch appointments
   useEffect(() => {
+    if (!doctorId) {
+      setAppointments([])
+      setIsLoading(false)
+      return;
+    }
+
     const appointmentsRef = ref(database, 'appointments')
 
-    const unsubscribe = onValue(appointmentsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const appointmentsData = snapshot.val()
+    try {
+      const unsubscribe = onValue(appointmentsRef, (snapshot) => {
+        setIsLoading(false) // Set loading to false in all cases
+        
+        if (!snapshot.exists()) {
+          setAppointments([])
+          return
+        }
 
-        // Convert object to array
-        const appointmentsArray = Object.entries(appointmentsData).map(
-          ([id, data]: [string, any]) => ({
+        const appointmentsData = snapshot.val()
+        const today = new Date().toISOString().split("T")[0]
+        
+        const appointmentsArray = Object.entries(appointmentsData)
+          .map(([id, data]: [string, any]) => ({
             id,
             ...data,
-          })
-        )
+          }))
+          .filter(appointment => 
+            appointment.doctorId === doctorId && 
+            appointment.date === today
+          )
 
-        // Filter for today's appointments
-        const today = new Date().toISOString().split("T")[0]
-        const todaysAppointments = appointmentsArray.filter(
-          (appointment) => appointment.date === today
-        )
-
-        setAppointments(todaysAppointments)
-      } else {
+        setAppointments(appointmentsArray)
+      }, (error) => {
+        console.error("Error fetching appointments:", error)
+        setIsLoading(false)
         setAppointments([])
-      }
-      setIsLoading(false)
-    })
+        toast({
+          title: "Error",
+          description: "Failed to fetch appointments",
+          variant: "destructive",
+        })
+      })
 
-    return () => unsubscribe()
-  }, [])
+      return () => unsubscribe()
+    } catch (error) {
+      console.error("Error setting up appointments listener:", error)
+      setIsLoading(false)
+      setAppointments([])
+    }
+  }, [doctorId, toast])
 
   // Fetch patient data when appointment is selected
   useEffect(() => {
@@ -104,21 +124,31 @@ export default function DoctorDashboardPage() {
 
   // Get doctor's name from localStorage
   useEffect(() => {
-    try {
-      const userData = localStorage.getItem("user")
-      if (userData) {
-        const user = JSON.parse(userData) as Doctor
-        setDoctorName(user.name)
+  try {
+    const userData = localStorage.getItem("user")
+    if (userData) {
+      const user = JSON.parse(userData)
+      setDoctorName(user.name)
+      setDoctorId(user.userId) // Now we have the correct Firebase document ID
+      
+      if (!user.id) {
+        toast({
+          title: "Error",
+          description: "Doctor ID not found. Please login again.",
+          variant: "destructive",
+        })
+        
       }
-    } catch (error) {
-      console.error("Error getting doctor's name:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load doctor information",
-        variant: "destructive",
-      })
     }
-  }, [toast])
+  } catch (error) {
+    console.error("Error getting doctor's info:", error)
+    toast({
+      title: "Error",
+      description: "Failed to load doctor information",
+      variant: "destructive",
+    })
+  }
+}, [toast])
 
   const handleSelectAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment)

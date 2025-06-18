@@ -265,7 +265,7 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
         patientAge: data.patientAge,
         gender: data.gender,
         mobileNumber: data.mobileNumber,
-        doctorId: data.doctorId,
+        doctorId: doctor?.doctorId || "",
         doctorName: doctor?.name || "",
         date: new Date().toISOString().split("T")[0], // Today's date
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),

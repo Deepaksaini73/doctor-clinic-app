@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -10,7 +9,16 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { Toaster } from "@/components/ui/toaster"
+
+// Update UserData interface
+interface UserData {
+  id: string       // Firebase document ID
+  userId?: string  // Custom user ID
+  name: string
+  email: string
+  role: "admin" | "doctor" | "receptionist"
+  status: "active" | "inactive"
+}
 
 const DEMO_CREDENTIALS = {
   admin: {
@@ -39,19 +47,14 @@ export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    // Form validation
+  const validateForm = (): boolean => {
     if (!email || !password) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
         variant: "destructive",
       })
-      setIsLoading(false)
-      return
+      return false
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
       toast({
@@ -59,9 +62,16 @@ export default function LoginPage() {
         description: "Please enter a valid email address",
         variant: "destructive",
       })
-      setIsLoading(false)
-      return
+      return false
     }
+    return true
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!validateForm()) return
+    setIsLoading(true)
+
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -72,47 +82,11 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        // Specific error messages based on response
-        if (response.status === 401) {
-          toast({
-            variant: "destructive",
-            title: "Invalid Credentials",
-            description: "The email or password you entered is incorrect",
-          })
-        } else if (response.status === 404) {
-          toast({
-            variant: "destructive",
-            title: "Account Not Found",
-            description: "No account exists with this email",
-          })
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: data.message || "An error occurred during login",
-          })
-        }
+        handleLoginError(response.status, data.message)
         return
       }
 
-      // Success toast
-      toast({
-        title: "Login Successful",
-        description: `Welcome back, ${data.user.name}!`,
-      })
-
-      // Store user data and redirect
-      localStorage.setItem("token", data.token)
-      localStorage.setItem("user", JSON.stringify(data.user))
-
-      const redirects = {
-        admin: "/admin/dashboard",
-        doctor: "/doctor/dashboard",
-        receptionist: "/receptionist",
-        default: "/dashboard",
-      }
-
-      router.push(redirects[data.user.role] || redirects.default)
+      handleLoginSuccess(data)
     } catch (error) {
       console.error("Login error:", error)
       toast({
@@ -125,17 +99,83 @@ export default function LoginPage() {
     }
   }
 
+  const handleLoginError = (status: number, message?: string) => {
+    const errorMessages = {
+      401: "The email or password you entered is incorrect",
+      404: "No account exists with this email",
+      default: message || "An error occurred during login",
+    }
+
+    toast({
+      variant: "destructive",
+      title: status === 401 ? "Invalid Credentials" : "Login Failed",
+      description: errorMessages[status as keyof typeof errorMessages] || errorMessages.default,
+    })
+  }
+
+  // Update handleLoginSuccess function
+  const handleLoginSuccess = (data: { user: UserData; token: string }) => {
+    console.log("Login response data:", data);
+
+    if (!data.user || !data.token) {
+      console.error("Invalid login response data");
+      toast({
+        variant: "destructive",
+        title: "Login Error",
+        description: "Invalid response from server",
+      });
+      return;
+    }
+
+    if (!data.user.role) {
+      console.error("User role missing");
+      toast({
+        variant: "destructive",
+        title: "Login Error",
+        description: "User role not defined",
+      });
+      return;
+    }
+
+    const userData = {
+      ...data.user,
+      userId: data.user.userId || data.user.id
+    };
+
+    // Store data based on keepLoggedIn preference
+    if (keepLoggedIn) {
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(userData));
+    } else {
+      sessionStorage.setItem("token", data.token);
+      sessionStorage.setItem("user", JSON.stringify(userData));
+    }
+
+    const redirects: Record<string, string> = {
+      admin: "/admin/dashboard",
+      doctor: "/doctor/dashboard",
+      receptionist: "/receptionist",
+      default: "/dashboard",
+    };
+
+    const redirectPath = redirects[data.user.role] || redirects.default;
+
+    toast({
+      title: "Login Successful",
+      description: `Welcome back, ${data.user.name}!`,
+    });
+
+    router.push(redirectPath);
+  }
+
   const autoLogin = async (role: keyof typeof DEMO_CREDENTIALS) => {
     const credentials = DEMO_CREDENTIALS[role]
     setEmail(credentials.email)
     setPassword(credentials.password)
+    setKeepLoggedIn(true)
 
-    // Small delay to show the form filling
     await new Promise((resolve) => setTimeout(resolve, 500))
-
-    // Trigger form submission
-    const submitEvent = new Event("submit", { cancelable: true })
-    document.querySelector("form")?.dispatchEvent(submitEvent)
+    document.querySelector("form")?.dispatchEvent(new Event("submit", { cancelable: true }))
   }
 
   return (
@@ -201,11 +241,9 @@ export default function LoginPage() {
                     <input
                       type="checkbox"
                       id="keep-logged-in"
-                      checked={keepLoggedIn}
-                      onChange={(e) => setKeepLoggedIn(e.target.checked)}
                       className="rounded border-gray-300"
                     />
-                    <Label htmlFor="keep-logged-in" className="text-sm">
+                    <Label className="text-sm">
                       Keep me login
                     </Label>
                   </div>
