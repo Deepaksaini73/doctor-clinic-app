@@ -53,35 +53,72 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
-    const appointmentsRef = ref(database, 'appointments')
-    
-    // Set up real-time listener
-    const unsubscribe = onValue(appointmentsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const appointmentsData = snapshot.val()
-        const appointmentsArray = Object.entries(appointmentsData).map(([id, data]: [string, any]) => ({
-          id,
-          ...data
-        }))
-        setAppointments(appointmentsArray)
-      } else {
-        setAppointments([])
-      }
-      setIsLoading(false)
-    })
+    let intervalId: NodeJS.Timeout
 
-    // Cleanup subscription on unmount
-    return () => unsubscribe()
-  }, [])
+    const fetchAppointments = async () => {
+      try {
+        const response = await fetch('/api/appointments')
+        const data = await response.json()
+        
+        if (data.appointments) {
+          setAppointments(data.appointments)
+        }
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Error fetching appointments:', error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch appointments",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+      }
+    }
+
+    fetchAppointments()
+    // Poll every 30 seconds for updates
+    intervalId = setInterval(fetchAppointments, 30000)
+
+    return () => clearInterval(intervalId)
+  }, [toast])
 
   const handleStatusUpdate = async (appointmentId: string, newStatus: string) => {
     try {
-      const appointmentRef = ref(database, `appointments/${appointmentId}`)
-      await update(appointmentRef, { status: newStatus })
+      // Optimistically update UI
+      setAppointments(currentAppointments => 
+        currentAppointments.map(appointment => 
+          appointment.id === appointmentId 
+            ? { ...appointment, status: newStatus }
+            : appointment
+        )
+      );
+
+      const response = await fetch(`/api/appointments/${appointmentId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!response.ok) {
+        // Revert optimistic update if API call fails
+        setAppointments(currentAppointments => 
+          currentAppointments.map(appointment => 
+            appointment.id === appointmentId 
+              ? { ...appointment, status: appointment.status }
+              : appointment
+          )
+        );
+        throw new Error('Failed to update status')
+      }
+
       toast({
         title: "Success",
         description: "Appointment status updated successfully",
       })
+
+      // Notify parent component if needed
       if (onAppointmentUpdated) {
         onAppointmentUpdated()
       }
@@ -152,10 +189,10 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+    <Card className="w-full">
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <Calendar className="h-5 w-5 text-blue-600" />
             Today Appointments
           </CardTitle>
@@ -164,40 +201,42 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
           </span>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         <div className="space-y-4">
-          {/* Search and Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Split Search Inputs */}
-            <div className="flex-1 flex gap-2">
-              <Select value={searchType} onValueChange={(value: "patient" | "doctor") => setSearchType(value)}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Search by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="patient">Patient</SelectItem>
-                    <SelectItem value="doctor">Doctor</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={`Search by ${searchType === "patient" ? "patient name" : "doctor name"}...`}
-                  className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-lg"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+          {/* Search and Filters - Stacked on mobile */}
+          <div className="flex flex-col space-y-3">
+            {/* Search Section */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                <Select value={searchType} onValueChange={(value: "patient" | "doctor") => setSearchType(value)}>
+                  <SelectTrigger className="w-full sm:w-[130px]">
+                    <SelectValue placeholder="Search by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="patient">Patient</SelectItem>
+                      <SelectItem value="doctor">Doctor</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder={`Search by ${searchType === "patient" ? "patient name" : "doctor name"}...`}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Status and Priority Filters */}
-            <div className="flex gap-2">
+            {/* Filters Section */}
+            <div className="flex flex-col sm:flex-row gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[130px]">
+                <SelectTrigger className="w-full sm:w-[130px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -212,7 +251,7 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
               </Select>
 
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-[130px]">
+                <SelectTrigger className="w-full sm:w-[130px]">
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -227,7 +266,7 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
             </div>
           </div>
 
-          {/* Active Filters Display */}
+          {/* Active Filters - Wrap on mobile */}
           <div className="flex flex-wrap gap-2">
             {searchQuery && (
               <Badge variant="secondary" className="gap-1">
@@ -251,50 +290,55 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
 
           {/* Appointments List */}
           {isLoading ? (
-            <div className="flex justify-center items-center h-64">
+            <div className="flex justify-center items-center h-48 sm:h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
             </div>
           ) : filteredAppointments.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              {patientSearchQuery || doctorSearchQuery ? "No appointments match your search" : "No appointments scheduled for today"}
+            <div className="text-center py-8 px-4 text-gray-500">
+              {searchQuery ? "No appointments match your search" : "No appointments scheduled for today"}
             </div>
           ) : (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
+            <div className="space-y-4 max-h-[calc(100vh-400px)] overflow-y-auto">
               {filteredAppointments.map((appointment) => (
-                <div key={appointment.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex justify-between items-start">
+                <div key={appointment.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:bg-gray-50">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                           <span className="text-blue-600 font-medium text-sm">
                             {appointment.patientName.charAt(0)}
                           </span>
                         </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">
+                        <div className="min-w-0">
+                          <h3 className="font-medium text-gray-900 truncate">
                             {appointment.patientName}{" "}
                             <span className="text-sm text-gray-500">({appointment.patientAge}y)</span>
                           </h3>
-                          <p className="text-sm text-gray-600">{appointment.doctorName}</p>
+                          <p className="text-sm text-gray-600 truncate">{appointment.doctorName}</p>
                         </div>
                       </div>
-                      {/* Update symptoms rendering with null check */}
                       {appointment.symptoms && appointment.symptoms.length > 0 && (
-                        <p className="text-sm text-gray-600 mb-3">
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                           {appointment.symptoms.join(", ")}
                         </p>
                       )}
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {getStatusBadge(appointment.status)}
                         {getPriorityBadge(appointment.priority)}
+                        <span className="text-sm font-medium text-gray-900 sm:hidden">
+                          {appointment.time}
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium text-gray-900">{appointment.time}</span>
-                      <div className="flex items-center gap-1 mt-2">
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 mt-2 sm:mt-0">
+                      <span className="hidden sm:inline text-sm font-medium text-gray-900">
+                        {appointment.time}
+                      </span>
+                      <div className="flex items-center gap-2">
                         <Button 
                           variant="ghost" 
                           size="sm"
+                          className="h-9 px-2.5"
                           onClick={() => handleStatusUpdate(appointment.id, 
                             appointment.status === 'scheduled' ? 'in-progress' : 
                             appointment.status === 'in-progress' ? 'completed' : 'scheduled'
@@ -305,12 +349,12 @@ export default function AppointmentsList({ onAppointmentUpdated }: EnhancedAppoi
                         {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
                           <Button 
                             variant="ghost" 
-                            size="sm" 
-                            className="text-red-600 hover:text-red-700"
+                            size="sm"
+                            className="h-9 px-2.5 text-red-600 hover:text-red-700"
                             onClick={() => handleStatusUpdate(appointment.id, 'cancelled')}
                           >
                             <Trash2 className="h-4 w-4" />
-                            <span className="ml-1">Cancel</span>
+                            <span className="ml-1 hidden sm:inline">Cancel</span>
                           </Button>
                         )}
                       </div>

@@ -124,58 +124,78 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
 
   return (
     <Card className="w-full border-receptionist border-t-4">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Voice Input</span>
-          <div className="flex gap-2">
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <span className="text-lg sm:text-xl">Voice Input</span>
+          <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
             <Button
               variant={isListening ? "destructive" : "default"}
               size="sm"
               onClick={toggleListening}
-              className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-receptionist hover:bg-blue-700"}
+              className={`w-full sm:w-auto ${
+                isListening ? "bg-red-500 hover:bg-red-600" : "bg-receptionist hover:bg-blue-700"
+              }`}
             >
               {isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
               {isListening ? "Stop" : "Start"} Recording
             </Button>
-            <Button variant="outline" size="sm" onClick={simulateVoiceInput}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={simulateVoiceInput}
+              className="w-full sm:w-auto"
+            >
               <Play className="mr-2 h-4 w-4" />
               Simulate Voice
             </Button>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         {error && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert variant="destructive" className="mb-4 text-sm">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         <Textarea
           placeholder="Speak or type patient information here..."
-          className="min-h-[150px] text-lg"
+          className="min-h-[120px] sm:min-h-[150px] text-base sm:text-lg"
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
         />
-        <div className="mt-2 text-sm text-gray-500">
+        <div className="mt-3 text-xs sm:text-sm text-gray-500 space-y-2">
           <p>
-            <strong>Voice Command Examples:</strong> "New appointment for [name], [age], with [symptoms]" or "Urgent
-            appointment for [name]"
+            <strong>Voice Command Examples:</strong>
           </p>
-          <p className="mt-1 text-xs italic">Note: This is a placeholder for future ML voice processing integration</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>"New appointment for [name], [age], with [symptoms]"</li>
+            <li>"Urgent appointment for [name]"</li>
+          </ul>
+          <p className="text-xs italic mt-2">
+            Note: This is a placeholder for future ML voice processing integration
+          </p>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={handleClearTranscript}>
+      <CardFooter className="flex flex-col sm:flex-row justify-between gap-4 p-4 sm:p-6">
+        <Button
+          variant="outline"
+          onClick={handleClearTranscript}
+          className="w-full sm:w-auto"
+        >
           <Trash2 className="mr-2 h-4 w-4" /> Clear
         </Button>
-        <div className="space-x-2">
-          <Button variant="outline" onClick={processVoiceCommand}>
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
+          <Button
+            variant="outline"
+            onClick={processVoiceCommand}
+            className="w-full sm:w-auto"
+          >
             Process Command
           </Button>
           <Button
             onClick={handleSaveTranscript}
             disabled={!transcript.trim()}
-            className="bg-receptionist hover:bg-blue-700"
+            className="w-full sm:w-auto bg-receptionist hover:bg-blue-700"
           >
             <Save className="mr-2 h-4 w-4" /> Use Transcript
           </Button>

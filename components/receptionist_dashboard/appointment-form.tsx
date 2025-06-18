@@ -76,18 +76,15 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
   })
 
   useEffect(() => {
-    // Fetch doctors from Firebase
     const fetchDoctors = async () => {
       try {
-        const doctorsRef = ref(database, 'doctors')
-        const snapshot = await get(doctorsRef)
-        if (snapshot.exists()) {
-          const doctorsData = snapshot.val()
-          const doctorsArray = Object.entries(doctorsData).map(([id, data]: [string, any]) => ({
-            id,
-            ...data
-          }))
-          setDoctors(doctorsArray)
+        const response = await fetch('/api/doctors')
+        const data = await response.json()
+        
+        if (data.doctors) {
+          setDoctors(data.doctors)
+        } else {
+          throw new Error('No doctors found')
         }
       } catch (error) {
         console.error("Error fetching doctors:", error)
@@ -301,159 +298,216 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
   }
 
   return (
-    <Card className="border-receptionist border-t-4">
-      <CardHeader>
-        <CardTitle>Schedule Appointment</CardTitle>
+    <Card className="border-receptionist border-t-4 max-w-full overflow-hidden">
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="text-xl sm:text-2xl">Schedule Appointment</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+            {/* Patient ID Section */}
+            <FormField
+              control={form.control}
+              name="patientId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Patient ID (Optional)</FormLabel>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <FormControl className="flex-1">
+                      <Input placeholder="Enter patient ID" {...field} />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePatientSearch}
+                      disabled={isSearching}
+                      className="w-full sm:w-auto"
+                    >
+                      {isSearching ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                      <span className="ml-2">Search</span>
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Patient Info Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
-                name="patientId"
+                name="patientName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Patient ID (Optional)</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input placeholder="Enter patient ID" {...field} />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handlePatientSearch}
-                        disabled={isSearching}
-                        className="whitespace-nowrap"
-                      >
-                        {isSearching ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Search className="h-4 w-4" />
-                        )}
-                        <span className="ml-2">Search</span>
-                      </Button>
-                    </div>
+                    <FormLabel>Patient Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter patient name" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="patientName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Patient Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter patient name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="patientAge"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Age</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Enter age"
-                          {...field}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            field.onChange(value === '' ? '' : Number(value));
-                          }}
-                          value={field.value === undefined || field.value === null ? '' : field.value}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="gender"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Gender</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select gender" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="mobileNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mobile Number</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="tel" 
-                          placeholder="Enter mobile number" 
-                          {...field}
-                          pattern="[0-9]{10}"
-                          title="Please enter a valid 10-digit mobile number"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="patientAge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Age</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Enter age"
+                        {...field}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          field.onChange(value === '' ? '' : Number(value));
+                        }}
+                        value={field.value === undefined || field.value === null ? '' : field.value}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="mobileNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mobile Number</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="tel" 
+                        placeholder="Enter mobile number" 
+                        {...field}
+                        pattern="[0-9]{10}"
+                        title="Please enter a valid 10-digit mobile number"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Update Priority Section for better mobile layout */}
             <FormField
               control={form.control}
-              name="symptoms"
+              name="priority"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Symptoms</FormLabel>
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-sm font-medium">Priority</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Describe symptoms" className="min-h-[80px]" {...field} />
+                    <RadioGroup 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value} 
+                      className="flex flex-col sm:flex-row gap-4 sm:gap-6"
+                    >
+                      {["routine", "urgent", "emergency"].map((value) => (
+                        <FormItem key={value} className="flex items-center space-x-2">
+                          <FormControl>
+                            <RadioGroupItem value={value} />
+                          </FormControl>
+                          <FormLabel className="font-normal capitalize">
+                            {value}
+                          </FormLabel>
+                        </FormItem>
+                      ))}
+                    </RadioGroup>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Symptoms and Notes with better mobile spacing */}
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="symptoms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Symptoms</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe symptoms" 
+                        className="min-h-[80px] resize-none" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Additional Notes</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Any additional information" className="min-h-[80px]" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Doctor Selection with better mobile view */}
             <FormField
               control={form.control}
               name="doctorId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Preferred Doctor</FormLabel>
+                  <FormLabel className="text-sm font-medium">Preferred Doctor</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a doctor" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="max-h-[200px]">
                       {doctors.map((doctor) => (
                         <SelectItem key={doctor.id} value={doctor.id}>
-                          {doctor.name} - {doctor.specialization}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                            <span>{doctor.name}</span>
+                            <span className="text-xs text-gray-500">
+                              {doctor.specialization}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -463,60 +517,17 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="priority"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Priority</FormLabel>
-                  <FormControl>
-                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="routine" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Routine</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="urgent" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Urgent</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="emergency" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Emergency</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Additional Notes</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Any additional information" className="min-h-[80px]" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <CardFooter className="px-0 pt-4">
-              <Button type="submit" className="w-full bg-receptionist hover:bg-blue-700" disabled={isLoading}>
+            <CardFooter className="p-4 sm:p-6">
+              <Button 
+                type="submit"
+                className="w-full bg-receptionist hover:bg-blue-700 h-11"
+                disabled={isLoading}
+              >
                 {isLoading ? (
-                  <>
+                  <div className="flex items-center justify-center">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Scheduling...
-                  </>
+                    <span>Scheduling...</span>
+                  </div>
                 ) : (
                   "Schedule Appointment"
                 )}
