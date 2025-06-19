@@ -44,7 +44,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [keepLoggedIn, setKeepLoggedIn] = useState(false)
+  const [keepLoggedIn, setKeepLoggedIn] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
 
