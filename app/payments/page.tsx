@@ -166,10 +166,6 @@ export default function PaymentsPage() {
   const handlePaymentComplete = async () => {
     setIsNewPaymentOpen(false);
     await fetchPayments();
-    toast({
-      title: "Success",
-      description: "Payment created successfully",
-    });
   };
 
   return (
@@ -256,21 +252,23 @@ export default function PaymentsPage() {
         {/* Payments List */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between">
               <CardTitle>Payment Transactions</CardTitle>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
+
+              <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:gap-4">
+                {/* Search and Filter Group */}
+                <div className="flex flex-col space-y-2 md:space-y-0 md:flex-row md:items-center md:gap-2">
                   <Input
                     placeholder="Search payments..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-64"
+                    className="w-full md:w-64"
                   />
                   <Select
                     value={filterStatus}
                     onValueChange={setFilterStatus}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full md:w-[180px]">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -281,17 +279,21 @@ export default function PaymentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleExport}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => setIsNewPaymentOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Payment
-                </Button>
+
+                {/* Action Buttons Group */}
+                <div className="flex items-center gap-2 md:gap-4">
+                  <Button variant="outline" size="sm" onClick={handleExport} className="flex-1 md:flex-none">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700 flex-1 md:flex-none"
+                    onClick={() => setIsNewPaymentOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Payment
+                  </Button>
+                </div>
               </div>
             </div>
           </CardHeader>

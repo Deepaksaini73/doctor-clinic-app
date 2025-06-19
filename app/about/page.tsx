@@ -19,28 +19,28 @@ const teamMembers = [
   {
     name: "Sachin Choudhary",
     role: "Backend Developer",
-    rollNo: "121CS0XXX",
-    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750315962/deepak_image_dxpubx.jpg",
+    rollNo: "123CS0157",
+    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750336143/sachin_yoqs9q.jpg",
     github: "https://github.com/ghost-28-02",
-    linkedin: "https://linkedin.com/in/member2",
+    linkedin: "https://www.linkedin.com/in/sachin-choudhary-b87890323?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app",
     icon: <Database className="w-6 h-6" />
   },
   {
     name: "Shivam Sharma",
     role: "ML Engineer",
-    rollNo: "121CS0XXX",
-    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750315962/deepak_image_dxpubx.jpg",
+    rollNo: "123CR0836",
+    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750337126/shivaang_zag4pu.png",
     github: "https://github.com/ShivangSharma26",
-    linkedin: "https://linkedin.com/in/member3",
-    icon: <Code className="w-6 h-6" />
+    linkedin: "https://www.linkedin.com/in/shivang-sharma-9324512a7/",
+    icon: <Brain className="w-6 h-6" />
   },
   {
-    name: "Shubham Shaoo",
+    name: "Shubham Sahoo",
     role: "ML Engineer",
-    rollNo: "121CS0XXX",
-    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750315962/deepak_image_dxpubx.jpg",
+    rollNo: "123CR0834",
+    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750333822/1750332647451_vhwz8i.jpg",
     github: "https://github.com/realsubhamsahoo",
-    linkedin: "https://linkedin.com/in/member4",
+    linkedin: "https://www.linkedin.com/in/realsubhamsahoo/",
     icon: <Brain className="w-6 h-6" />
   }
 ]

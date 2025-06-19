@@ -61,13 +61,14 @@ export function PaymentForm({ onSuccess, onCancel }: PaymentFormProps) {
     },
   })
 
-  const generateInvoiceId = () => {
-    const date = new Date()
-    const year = date.getFullYear().toString().slice(-2)
-    const month = (date.getMonth() + 1).toString().padStart(2, "0")
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
-    return `INV₹{year}₹{month}₹{random}`
-  }
+// Replace the existing generateInvoiceId function with this:
+const generateInvoiceId = () => {
+  const date = new Date()
+  const year = date.getFullYear().toString().slice(-2)
+  const month = (date.getMonth() + 1).toString().padStart(2, "0")
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
+  return `INV${year}${month}${random}`
+}
 
   const handleSubmit = async (data: PaymentFormData) => {
     setIsSubmitting(true)
