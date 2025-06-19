@@ -25,6 +25,7 @@ interface Patient {
 interface Doctor {
   id: string;
   name: string;
+  doctorId: string; // Assuming doctorId is a unique identifier for the doctor
   specialization: string;
 }
 
@@ -119,7 +120,7 @@ export default function CreateAppointment({
         patientAge: parseInt(formData.patientAge),
         gender: formData.patientGender,
         mobileNumber: formData.contactNumber,
-        doctorId: formData.doctorId,
+        doctorId: selectedDoctor.doctorId,
         doctorName: selectedDoctor.name,
         date: formattedDate, // Use consistent date format
         time: formattedTime, // Now in 12-hour format with AM/PM

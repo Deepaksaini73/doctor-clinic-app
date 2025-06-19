@@ -38,7 +38,7 @@ export default function AdminDashboardPage() {
   return (
     <MainLayout 
       title={`Welcome back, ${adminName || 'Admin'}!`} 
-      subtitle="Here is the latest update for the last 7 days, check now."
+      subtitle="Manage the clinic, monitor finances, and oversee operations."
     >
       <div className="space-y-6">
         <StatisticsCards />

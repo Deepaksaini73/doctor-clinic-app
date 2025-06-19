@@ -68,6 +68,24 @@ const safeGetHour = (time: string | undefined): string => {
   }
 };
 
+// Add this helper function after imports
+const downloadCSV = (data: any[], filename: string) => {
+  // Convert data to CSV string
+  const headers = Object.keys(data[0]).join(',');
+  const rows = data.map(item => Object.values(item).join(','));
+  const csv = [headers, ...rows].join('\n');
+  
+  // Create download link
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export default function AnalyticsDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -130,10 +148,18 @@ export default function AnalyticsDashboard() {
     emergency: appointments.filter((app) => app.priority === "emergency").length,
   }
 
-  const appointmentsByDoctor = doctors.map((doctor) => ({
-    doctorName: doctor.name,
-    count: appointments.filter((app) => app.doctorId === doctor.id).length,
-  }))
+  // Update the appointmentsByDoctor calculation
+  const appointmentsByDoctor = doctors
+    .map((doctor) => ({
+      doctorName: doctor.name,
+      count: appointments.filter((app) => 
+        // Debugging line
+        app.doctorId === doctor.doctorId && 
+        app.status !== "cancelled" // Optionally exclude cancelled appointments
+      ).length,
+      id: doctor.id // Keep doctor ID for reference
+    }))
+    .sort((a, b) => b.count - a.count); // Sort by appointment count
 
   // Calculate time distribution from actual data
   const timeDistribution = appointments.reduce((acc: { [key: string]: number }, app) => {
@@ -165,6 +191,39 @@ export default function AnalyticsDashboard() {
     { name: 'Urgent', value: appointmentsByPriority.urgent },
     { name: 'Emergency', value: appointmentsByPriority.emergency },
   ]
+
+  // Add these export handlers inside AnalyticsDashboard component
+  const handleExportStatus = () => {
+    const exportData = statusData.map(item => ({
+      Status: item.name,
+      Appointments: item.value
+    }));
+    downloadCSV(exportData, 'appointments_by_status');
+  };
+
+  const handleExportPriority = () => {
+    const exportData = priorityData.map(item => ({
+      Priority: item.name,
+      Appointments: item.value
+    }));
+    downloadCSV(exportData, 'appointments_by_priority');
+  };
+
+  const handleExportHourly = () => {
+    const exportData = timeDistributionArray.map(item => ({
+      Hour: item.hour,
+      Appointments: item.count
+    }));
+    downloadCSV(exportData, 'hourly_distribution');
+  };
+
+  const handleExportDoctorWorkload = () => {
+    const exportData = appointmentsByDoctor.map(item => ({
+      Doctor: item.doctorName,
+      Appointments: item.count
+    }));
+    downloadCSV(exportData, 'doctor_workload');
+  };
 
   return (
     <div className="space-y-4">
@@ -300,7 +359,7 @@ export default function AnalyticsDashboard() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Hourly Distribution</CardTitle>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExportHourly}>
               <Download className="mr-2 h-4 w-4" /> Export
             </Button>
           </div>
@@ -330,7 +389,7 @@ export default function AnalyticsDashboard() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Doctor Workload</CardTitle>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExportDoctorWorkload}>
               <Download className="mr-2 h-4 w-4" /> Export
             </Button>
           </div>
@@ -338,13 +397,37 @@ export default function AnalyticsDashboard() {
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <RechartsBarChart data={appointmentsByDoctor}>
+            <RechartsBarChart data={appointmentsByDoctor} margin={{ top: 20, right: 30, left: 20, bottom: 70 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="doctorName" />
+              <XAxis 
+                dataKey="doctorName"
+                angle={-45}
+                textAnchor="end"
+                interval={0}
+                height={80}
+              />
               <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="count" fill="#8884d8" />
+              <Tooltip 
+                formatter={(value: number) => [`${value} appointments`, 'Appointments']}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  padding: '8px'
+                }}
+              />
+              <Bar 
+                dataKey="count" 
+                fill="#8884d8"
+                name="Appointments"
+              >
+                {appointmentsByDoctor.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={COLORS[index % COLORS.length]} 
+                  />
+                ))}
+              </Bar>
             </RechartsBarChart>
           </ResponsiveContainer>
         </CardContent>

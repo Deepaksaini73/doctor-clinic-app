@@ -36,7 +36,7 @@ export default function ReceptionistPage() {
   return (
     <MainLayout 
       title={`Welcome back, ${receptionistName || 'Receptionist'}!`} 
-      subtitle="Here is the latest update for the last 7 days, check now."
+      subtitle="Handle appointments, patient check-ins, and daily front desk tasks."
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Voice Booking System */}

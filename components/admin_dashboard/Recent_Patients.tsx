@@ -123,7 +123,7 @@ export default function RecentPatients() {
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Age</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Phone Number</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                {/* <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th> */}
               </tr>
             </thead>
             <tbody>
@@ -140,7 +140,7 @@ export default function RecentPatients() {
                   <td className="py-3 px-4 text-sm">
                     <Badge className="bg-blue-100 text-blue-800">{appointment.time}</Badge>
                   </td>
-                  <td className="py-3 px-4 text-sm">
+                  {/* <td className="py-3 px-4 text-sm">
                     <div className="flex items-center gap-2">
                       <AnimatedButton variant="ghost" size="sm" animation="pulse">
                         <Edit className="h-4 w-4" />
@@ -154,7 +154,7 @@ export default function RecentPatients() {
                         <Trash2 className="h-4 w-4" />
                       </AnimatedButton>
                     </div>
-                  </td>
+                  </td> */}
                 </tr>
               ))}
             </tbody>
