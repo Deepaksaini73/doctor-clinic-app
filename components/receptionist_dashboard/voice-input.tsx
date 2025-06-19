@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Mic, MicOff, Trash2, Save, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { APPOINTMENT_SYSTEM_PROMPT } from "@/lib/prompt-service";
 
 interface VoiceInputProps {
   onTranscriptComplete: (processedData: any) => void;
@@ -20,7 +19,8 @@ interface VoiceInputProps {
 
 export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
   const [isListening, setIsListening] = useState<boolean>(false);
-  const [transcript, setTranscript] = useState<string>("");
+  const [finalTranscript, setFinalTranscript] = useState<string>(""); // ✅ NEW: store cumulative final text
+  const [transcript, setTranscript] = useState<string>(""); // ✅ shows final + interim
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const recognitionRef = useRef<any>(null);
@@ -35,12 +35,10 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
       recognition.interimResults = true;
       recognition.lang = "en-US";
 
-      let finalTranscript = "";
-
       recognition.onstart = () => {
         setIsListening(true);
         setError(null);
-        finalTranscript = ""; // Reset final transcript when starting new recording
+        // ✅ Do NOT reset finalTranscript here!
       };
 
       recognition.onerror = (e: any) => {
@@ -55,18 +53,20 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
 
       recognition.onresult = (event: any) => {
         let interimTranscript = "";
+        let localFinal = finalTranscript; // get current final
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const transcriptPiece = event.results[i][0].transcript || "";
           if (event.results[i].isFinal) {
-            finalTranscript += transcriptPiece + " ";
+            localFinal += transcriptPiece + " ";
           } else {
             interimTranscript += transcriptPiece;
           }
         }
 
-        const currentTranscript = (finalTranscript + interimTranscript).trim();
-        setTranscript(prev => (prev + " " + currentTranscript).trim());
+        localFinal = localFinal.trim();
+        setFinalTranscript(localFinal); // update final state
+        setTranscript((localFinal + " " + interimTranscript).trim()); // show final + interim
       };
 
       return () => {
@@ -79,11 +79,11 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
         "Speech recognition is not supported in this browser. Please use Chrome."
       );
     }
-  }, []);
+  }, [finalTranscript]); // ✅ depend on finalTranscript to keep latest value
+
   const startRecording = () => {
     try {
       if (recognitionRef.current && !isListening) {
-        // 🚫 DO NOT clear transcript
         recognitionRef.current.start();
       }
     } catch (err) {
@@ -113,6 +113,7 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
   };
 
   const handleClearTranscript = () => {
+    setFinalTranscript("");
     setTranscript("");
     setError(null);
   };
@@ -135,8 +136,6 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
         body: JSON.stringify({ transcript: text }),
       });
 
-      console.log("API status:", response.status);
-
       const data = await response.json();
       console.log("API response:", data);
 
@@ -144,7 +143,6 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
         throw new Error(data.error || `API returned status ${response.status}`);
       }
 
-      // Validate required fields are present AND non-empty
       const requiredFields = ["patientName", "patientAge", "gender", "symptoms", "priority"];
       const missingFields = requiredFields.filter(field => {
         const value = data[field];
@@ -172,9 +170,8 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
     }
   };
 
-
   const handleSaveTranscript = () => {
-    const trimmedTranscript = transcript.trim();
+    const trimmedTranscript = finalTranscript.trim();
     if (trimmedTranscript) {
       processTranscript(trimmedTranscript);
     }
@@ -216,7 +213,11 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
           placeholder="Speak or type patient information here..."
           className="min-h-[150px] text-lg"
           value={transcript || ""}
-          onChange={(e) => setTranscript(e.target.value || "")}
+          onChange={(e) => {
+            const value = e.target.value || "";
+            setTranscript(value);
+            setFinalTranscript(value); // keep both in sync if manually edited
+          }}
         />
         <div className="mt-2 text-sm text-gray-500">
           <p>
@@ -229,7 +230,6 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
             <strong>Example:</strong> "Hi, my name is Ramesh Verma. I am forty two years old male. My number is nine eight seven six five four three two one zero. I have headache and mild fever. I want to see Dr. Anita Sharma urgently. I have a history of migraine."
           </p>
         </div>
-
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button variant="outline" onClick={handleClearTranscript}>
@@ -237,7 +237,7 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
         </Button>
         <Button
           onClick={handleSaveTranscript}
-          disabled={!transcript.trim() || isProcessing}
+          disabled={!finalTranscript.trim() || isProcessing}
           className="bg-receptionist hover:bg-blue-700"
         >
           {isProcessing ? (

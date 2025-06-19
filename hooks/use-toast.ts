@@ -4,7 +4,8 @@
 import * as React from "react"
 
 const TOAST_LIMIT = 5
-const TOAST_REMOVE_DELAY = 1000
+const TOAST_REMOVE_DELAY = 500 // Reduced from 1000ms to 500ms
+const AUTO_CLOSE_DELAY = 2000 // New constant for auto-closing
 
 export type ToastProps = {
   id: string
@@ -167,6 +168,11 @@ export function toast({ ...props }: Toast) {
       },
     },
   })
+
+  // Auto-dismiss toast after delay
+  setTimeout(() => {
+    dismiss()
+  }, AUTO_CLOSE_DELAY)
 
   return {
     id,
