@@ -346,14 +346,14 @@ export default function PrescriptionEditor({
                   Templates
                 </Button>
               </DialogTrigger>
-              <DialogContent className="text-black">
+              <DialogContent className="text-black w-[95vw] max-w-[500px] p-4 md:p-6">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-semibold">Your Prescription Templates</DialogTitle>
                   <DialogDescription className="text-gray-600">
                     Select a saved template to quickly fill the prescription.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-3 py-4">
+                <div className="grid gap-3 py-4 max-h-[60vh] overflow-y-auto">
                   {isLoadingTemplates ? (
                     <div className="flex items-center justify-center py-4">
                       <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -365,7 +365,7 @@ export default function PrescriptionEditor({
                           <Button
                             key={template.id}
                             variant="outline"
-                            className="justify-start hover:bg-gray-50"
+                            className="w-full justify-start hover:bg-gray-50 px-3 py-2 h-auto"
                             onClick={() => {
                               setShowTemplateDialog(false);
                               applyTemplate(
@@ -378,9 +378,11 @@ export default function PrescriptionEditor({
                               );
                             }}
                           >
-                            <span className="flex items-center gap-2">
-                              {template.name}
-                            </span>
+                            <div className="flex items-center gap-2 w-full">
+                              <span className="truncate text-sm">
+                                {template.name}
+                              </span>
+                            </div>
                           </Button>
                         ))
                       ) : (
