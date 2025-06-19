@@ -319,7 +319,7 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-8 text-xs text-gray-500">© 2024 ओषधि | N6T Technologies. All right reserved.</div>
+          <div className="text-center mt-8 text-xs text-gray-500">© 2025 ओषधि | N6T Technologies. All right reserved.</div>
         </div>
       </div>
       {/* <Toaster /> */}
