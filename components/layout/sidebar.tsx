@@ -56,7 +56,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
       title: "Room",
       icon: Building2,
       href: "/rooms",
-      roles: ["admin", "receptionist"],
+      roles: [""],
     },
     {
       title: "Payment",

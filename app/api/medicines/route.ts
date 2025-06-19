@@ -16,35 +16,42 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { symptoms } = body;
+    const { symptoms, patientAge } = body;
 
     if (!symptoms || !Array.isArray(symptoms)) {
       return NextResponse.json({ error: "Symptoms array is required" }, { status: 400 });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: "API key not configured" }, { status: 500 });
-    }
+    const ageGroup = getAgeGroup(patientAge);
+    const ageContext = patientAge ? 
+      `for a ${patientAge} year old patient (${ageGroup.category}, ${ageGroup.range})` : 
+      "for an adult patient";
 
-    const prompt = `Given the following symptoms: ${symptoms.join(", ")}, provide a clinical assessment that includes:
-    1. A likely medical diagnosis based on the presented symptoms
-    2. A list of appropriate medicines with their dosage, frequency, duration, and any specific notes relevant to administration
-    
-    Format the output strictly as a JSON object using the structure below:
+    const prompt = `Given the following symptoms: ${symptoms.join(", ")} ${ageContext}, provide a concise clinical assessment including:
+1. A clear, one-line medical diagnosis based on the symptoms.
+2. A list of suitable medicines with precise dosage (use mg or ml, do not use "per day"), frequency, duration, and very short notes (1-2 lines maximum).
+
+Strict instructions:
+- Express dosage using mg or ml units only (avoid vague expressions like "per day").
+- Keep notes very brief: maximum 1-2 lines of clear instructions.
+- Ensure dosage, frequency, and duration are realistic for the specified age group (${ageContext}).
+- Do not add any explanations or disclaimers — return **only** a valid JSON object using this exact format:
+
+{
+  "diagnosis": "one-line diagnosis",
+  "medicines": [
     {
-      "diagnosis": "clear and concise medical diagnosis",
-      "medicines": [
-        {
-          "name": "medicine name",
-          "dosage": "e.g. 500mg",
-          "frequency": "e.g. twice daily",
-          "duration": "e.g. 5 days",
-          "notes": "specific administration instructions, if any (avoid general health warnings)"
-        }
-      ]
+      "name": "medicine name",
+      "dosage": "e.g. 250mg",
+      "frequency": "e.g. Every 6 hours",
+      "duration": "e.g. 5 days",
+      "notes": "1-2 lines only"
     }
-    
-    This output will be reviewed by a supervising physician — no general health disclaimers, warnings, or follow-up advice should be included. Respond only with the JSON object and no additional text.`;
+  ]
+}
+
+This will be verified by a physician. Return the JSON object only — no extra text.
+`;
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -96,3 +103,13 @@ export async function POST(request: Request) {
     }, { status: 500 });
   }
 }
+
+// Add this helper function
+const getAgeGroup = (age?: number) => {
+  if (!age) return { category: "adult", range: "18-65 years" };
+  if (age < 2) return { category: "infant", range: "0-2 years" };
+  if (age < 12) return { category: "child", range: "2-12 years" };
+  if (age < 18) return { category: "teen", range: "12-18 years" };
+  if (age < 65) return { category: "adult", range: "18-65 years" };
+  return { category: "elderly", range: "65+ years" };
+};

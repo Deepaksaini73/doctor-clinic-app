@@ -28,6 +28,21 @@ interface Doctor {
   specialization: string;
 }
 
+// Add this helper function after imports
+const convertTo12HourFormat = (time24: string): string => {
+  const [hour, minute] = time24.split(':').map(Number);
+
+  if (hour === 0) {
+    return `12:${minute.toString().padStart(2, '0')} AM`;
+  } else if (hour === 12) {
+    return `12:${minute.toString().padStart(2, '0')} PM`;
+  } else if (hour > 12) {
+    return `${(hour - 12).toString()}:${minute.toString().padStart(2, '0')} PM`;
+  } else {
+    return `${hour.toString()}:${minute.toString().padStart(2, '0')} AM`;
+  }
+};
+
 export default function CreateAppointment({
   isOpen,
   onOpenChange,
@@ -71,7 +86,7 @@ export default function CreateAppointment({
         patientId = `PAT${Date.now()}`
         const patientsRef = ref(database, 'patients')
         const newPatientRef = push(patientsRef)
-        
+
         await set(newPatientRef, {
           patientId,
           name: formData.patientName,
@@ -82,20 +97,20 @@ export default function CreateAppointment({
         })
       }
 
-      // Create appointment with patient reference
-      const appointmentsRef = ref(database, 'appointments')
-      const newAppointmentRef = push(appointmentsRef)
-      
-      const selectedDoctor = doctors.find(d => d.id === formData.doctorId)
-      if (!selectedDoctor) throw new Error("Doctor not found")
-
       // Format date and time properly
       const appointmentDate = new Date(formData.appointmentDate)
       const [hours, minutes] = formData.appointmentTime.split(':')
       appointmentDate.setHours(parseInt(hours), parseInt(minutes))
 
       const formattedDate = appointmentDate.toISOString().split('T')[0]
-      const formattedTime = `${hours}:${minutes}`
+      const formattedTime = convertTo12HourFormat(formData.appointmentTime)
+
+      // Create appointment with converted time
+      const appointmentsRef = ref(database, 'appointments')
+      const newAppointmentRef = push(appointmentsRef)
+
+      const selectedDoctor = doctors.find(d => d.id === formData.doctorId)
+      if (!selectedDoctor) throw new Error("Doctor not found")
 
       await set(newAppointmentRef, {
         id: newAppointmentRef.key,
@@ -107,7 +122,7 @@ export default function CreateAppointment({
         doctorId: formData.doctorId,
         doctorName: selectedDoctor.name,
         date: formattedDate, // Use consistent date format
-        time: formattedTime,
+        time: formattedTime, // Now in 12-hour format with AM/PM
         timestamp: appointmentDate.getTime(), // Add timestamp for easier filtering
         symptoms: formData.symptoms.split(',').map(s => s.trim()).filter(Boolean),
         status: "scheduled",
@@ -117,14 +132,14 @@ export default function CreateAppointment({
 
       toast({
         title: "Success",
-        description: patientType === "new" 
+        description: patientType === "new"
           ? `New patient created with ID: ${patientId} and appointment scheduled`
           : "Appointment created successfully",
       })
 
       onSuccess()
       onOpenChange(false)
-      
+
       // Reset form
       setFormData({
         patientName: "",
@@ -206,7 +221,7 @@ export default function CreateAppointment({
         <DialogHeader className="mb-6 text-center">
           <DialogTitle className="text-3xl font-extrabold text-blue-800">Create New Appointment</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Left Column */}
@@ -349,7 +364,9 @@ export default function CreateAppointment({
                       onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
                       min={new Date().toISOString().split('T')[0]}
                       required
-                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
+                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm 
+             placeholder:text-gray-400 text-gray-800 appearance-none cursor-pointer
+             hover:border-blue-400 transition-colors"
                     />
                   </div>
                   <div className="space-y-2">
@@ -360,7 +377,9 @@ export default function CreateAppointment({
                       value={formData.appointmentTime}
                       onChange={(e) => setFormData({ ...formData, appointmentTime: e.target.value })}
                       required
-                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm placeholder:text-gray-400"
+                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 shadow-sm 
+             placeholder:text-gray-400 text-gray-800 appearance-none cursor-pointer
+             hover:border-blue-400 transition-colors"
                     />
                   </div>
                 </div>
@@ -397,8 +416,8 @@ export default function CreateAppointment({
           </div>
 
           <div className="pt-8 border-t border-gray-200">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-blue-600 text-white hover:bg-blue-700 h-12 text-lg font-semibold shadow-md transition-all duration-200"
               disabled={!doctors?.length}
             >

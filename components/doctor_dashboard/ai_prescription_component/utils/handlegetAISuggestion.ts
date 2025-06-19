@@ -21,6 +21,68 @@ interface HandleAISuggestionsParams {
   toast: (args: any) => void;
 }
 
+interface AgeGroup {
+  category: "infant" | "child" | "teen" | "adult" | "elderly";
+  range: string;
+  dosageModifier: number;
+}
+
+interface DosageAdjustment {
+  medicines: Medicine[];
+  adjustmentNotes: string;
+}
+
+// Add this function before handleGetAISuggestions
+const getAgeGroup = (age: number): AgeGroup => {
+  if (age < 2) return { category: "infant", range: "0-2 years", dosageModifier: 0.25 };
+  if (age < 12) return { category: "child", range: "2-12 years", dosageModifier: 0.5 };
+  if (age < 18) return { category: "teen", range: "12-18 years", dosageModifier: 0.75 };
+  if (age < 65) return { category: "adult", range: "18-65 years", dosageModifier: 1 };
+  return { category: "elderly", range: "65+ years", dosageModifier: 0.8 };
+};
+
+// Add this function to adjust medicines using Gemini
+const adjustMedicinesForAge = async (
+  medicines: Medicine[],
+  patientAge: number
+): Promise<Medicine[]> => {
+  try {
+    console.log("Adjusting medicines for age:", { medicines, patientAge });
+
+    const response = await fetch("/api/adjust-medicines", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json" 
+      },
+      body: JSON.stringify({
+        medicines,
+        patientAge
+      })
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error("Adjustment Error:", data);
+      throw new Error(data.error || "Failed to adjust medicines");
+    }
+
+    if (!data.medicines || !Array.isArray(data.medicines)) {
+      throw new Error("Invalid response format");
+    }
+
+    return data.medicines;
+
+  } catch (error) {
+    console.error("Medicine Adjustment Error:", error);
+    return medicines.map(med => ({
+      ...med,
+      notes: `${med.notes || ""}\nWarning: Age adjustment failed. Please verify dosage manually.`
+    }));
+  }
+};
+
+// Modify the existing handleGetAISuggestions function
 export const handleGetAISuggestions = async ({
   symptoms,
   appointment,
@@ -39,11 +101,13 @@ export const handleGetAISuggestions = async ({
   }
 
   setIsSuggesting(true);
+  const coveredSymptoms = new Set<string>(); // Add this line
 
   try {
     const symptomSuggestions = new Map<string, any>();
     let hasAnyExistingData = false;
 
+    // Track covered symptoms during processing
     for (const symptom of symptoms) {
       const symptomRef = ref(database, `symptoms_medicines/${symptom}`);
       const snapshot = await get(symptomRef);
@@ -51,6 +115,7 @@ export const handleGetAISuggestions = async ({
       if (snapshot.exists()) {
         hasAnyExistingData = true;
         symptomSuggestions.set(symptom, snapshot.val());
+        coveredSymptoms.add(symptom); // Add this lineconsole
       }
     }
 
@@ -77,6 +142,7 @@ export const handleGetAISuggestions = async ({
         { medicine: Medicine; score: number; symptoms: Set<string> }
       >();
 
+      // Update symptom coverage during medicine processing
       symptomSuggestions.forEach((medicines, symptom) => {
         Object.values(medicines).forEach((med: any) => {
           const key = med.name.toLowerCase();
@@ -92,10 +158,12 @@ export const handleGetAISuggestions = async ({
               score: med.count || 1,
               symptoms: new Set([symptom])
             });
+            coveredSymptoms.add(symptom); // Add this line
           } else {
             const existing = medicineScores.get(key)!;
             existing.score += med.count || 1;
             existing.symptoms.add(symptom);
+            coveredSymptoms.add(symptom); // Add this line
           }
         });
       });
@@ -125,11 +193,29 @@ export const handleGetAISuggestions = async ({
         .slice(0, 5)
         .map(({ medicine }) => medicine);
 
-      const coveredSymptoms = new Set<string>();
-      medicineScores.forEach(({ symptoms }) => {
-        symptoms.forEach(s => coveredSymptoms.add(s));
-      });
+      let finalMedicines = sortedMedicines;
 
+      // Handle age-based adjustments
+      if (appointment?.patientAge) {
+        try {
+          
+          const adjustedMedicines = await adjustMedicinesForAge(
+            sortedMedicines,
+            appointment.patientAge
+          );
+          
+          if (Array.isArray(adjustedMedicines) && adjustedMedicines.length > 0) {
+            finalMedicines = adjustedMedicines;
+          } else {
+            console.warn("Invalid adjusted medicines format", adjustedMedicines);
+          }
+        } catch (adjustError) {
+          console.error("Age adjustment error:", adjustError);
+          // Keep original medicines if adjustment fails
+        }
+      }
+
+      // Generate diagnosis text with covered symptoms
       let diagnosisText = "Based on analysis of symptoms:\n";
       symptoms.forEach(symptom => {
         diagnosisText += `- ${symptom}: ${coveredSymptoms.has(symptom)
@@ -137,35 +223,47 @@ export const handleGetAISuggestions = async ({
           : "New symptom pattern"}\n`;
       });
 
+      // Set diagnosis first
       setDiagnosis(diagnosisText);
-      setMedicines(sortedMedicines);
+      
+      // Set medicines with final adjusted version
+      setMedicines(finalMedicines);
 
+      // Update uncovered symptoms handling
       const uncoveredSymptoms = symptoms.filter(s => !coveredSymptoms.has(s));
       if (uncoveredSymptoms.length > 0) {
         const aiResponse = await fetch("/api/medicines", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symptoms: uncoveredSymptoms })
+            body: JSON.stringify({ 
+              symptoms,
+              patientAge: appointment?.patientAge 
+            })
         });
 
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
-          setMedicines(prev => [...prev, ...aiData.medicines]);
-          setDiagnosis(prev =>
-            `${prev}\n\nAI Suggestions for new symptoms:\n${aiData.diagnosis}`
-          );
+          if (Array.isArray(aiData.medicines)) {
+            setMedicines(prev => [...prev, ...aiData.medicines]);
+            setDiagnosis(prev =>
+              `${prev}\n\nAI Suggestions for new symptoms:\n${aiData.diagnosis}`
+            );
+          }
         }
       }
 
       toast({
         title: "Suggestions Generated",
-        description: `Combined ${coveredSymptoms.size} known patterns${uncoveredSymptoms.length ? " with AI suggestions" : ""}`,
+        description: `Generated age-appropriate prescriptions for ${appointment?.patientAge || 'unknown'} year old patient`,
       });
     } else {
       const response = await fetch("/api/medicines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symptoms })
+          body: JSON.stringify({ 
+            symptoms,
+            patientAge: appointment?.patientAge 
+          })
       });
 
       if (!response.ok) throw new Error("Failed to get AI suggestions");
