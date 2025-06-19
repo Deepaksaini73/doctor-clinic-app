@@ -12,23 +12,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import MainLayout from "@/components/layout/main-layout"
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    clinicName: "Clinicare Medical Center",
-    clinicAddress: "123 Healthcare Ave, Medical District, NY 10001",
-    clinicPhone: "+1 (555) 123-4567",
-    clinicEmail: "info@clinicare.com",
-    timezone: "America/New_York",
-    language: "en",
-    emailNotifications: true,
-    smsNotifications: false,
-    appointmentReminders: true,
-    systemAlerts: true,
-    dataBackup: true,
-    autoBackupInterval: "daily",
-    maxLoginAttempts: 3,
-    sessionTimeout: 30,
-    twoFactorAuth: false,
-  })
+const [settings, setSettings] = useState({
+  clinicName: "General Medical Clinic",
+  clinicAddress: "123 Health Street, Sector 21, New Delhi, India",
+  clinicPhone: "+91 98765 43210",
+  clinicEmail: "xyz@yourclinic.com",
+  timezone: "Asia/Kolkata",
+  language: "en",
+  emailNotifications: true,
+  smsNotifications: true,
+  appointmentReminders: true,
+  systemAlerts: true,
+  dataBackup: true,
+  autoBackupInterval: "daily",
+  maxLoginAttempts: 3,
+  sessionTimeout: 30,
+  twoFactorAuth: false,
+});
 
   const handleSave = () => {
     // Save settings logic here

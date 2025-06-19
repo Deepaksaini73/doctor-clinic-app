@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import Image from "next/image"
 
 interface SidebarProps {
   userRole: string
@@ -128,10 +129,22 @@ export default function Sidebar({ userRole }: SidebarProps) {
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
+            <div className="w-8 h-8">
+              <Image
+                src="/logo.png"
+                alt="Logo"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
             </div>
-            {!collapsed && <span className="font-semibold text-gray-900">Clinicare</span>}
+            {!collapsed && (
+              <div className="flex items-center gap-1">
+                <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  ओषधि
+                </span>
+              </div>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -141,7 +154,12 @@ export default function Sidebar({ userRole }: SidebarProps) {
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setMobileOpen(false)} className="h-8 w-8 p-0 md:hidden">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setMobileOpen(false)}
+            className="h-8 w-8 p-0 md:hidden"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>

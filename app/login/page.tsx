@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import Image from "next/image"
 
 // Update UserData interface
 interface UserData {
@@ -184,11 +185,25 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">C</span>
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-12 h-12">
+                <Image
+                  src="logo.png"
+                  alt="Logo"
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
               </div>
-              <span className="text-2xl font-bold text-gray-900">Clinicare</span>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  ओषधि
+                </span>
+                <span className="text-gray-300">|</span>
+                <span className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  N6T Technologies
+                </span>
+              </div>
             </div>
           </div>
 
@@ -304,7 +319,7 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-8 text-xs text-gray-500">© 2024 Clinicare. All right reserved.</div>
+          <div className="text-center mt-8 text-xs text-gray-500">© 2024 ओषधि | N6T Technologies. All right reserved.</div>
         </div>
       </div>
       {/* <Toaster /> */}

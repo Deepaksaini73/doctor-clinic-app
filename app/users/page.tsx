@@ -64,7 +64,7 @@ export default function UsersPage() {
 
   const generateCredentials = (role: string) => {
     const timestamp = Date.now()
-    const email = `${role}${timestamp}@clinicare.com`
+    const email = `${role}${timestamp}@gmail.com`
     const password = `${role}${Math.random().toString(36).substring(2, 8)}`
 
     setNewUser({

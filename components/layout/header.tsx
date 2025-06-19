@@ -73,9 +73,9 @@ export default function Header({ title, subtitle, userName, userRole }: HeaderPr
           </div> */}
 
           {/* Mobile Search Button */}
-          <Button variant="ghost" size="sm" className="lg:hidden">
+          {/* <Button variant="ghost" size="sm" className="lg:hidden">
             <Search className="h-5 w-5" />
-          </Button>
+          </Button> */}
 
           {/* Notifications */}
           <DropdownMenu>
