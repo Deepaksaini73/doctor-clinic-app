@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Users, UserCheck, Calendar, TrendingUp } from "lucide-react"
+import { Users, UserCheck, Calendar, UserCog } from "lucide-react"
 import { StatCard } from "@/components/ui/enhanced-card"
 import { StatCardSkeleton } from "@/components/ui/loading-skeleton"
 import { database } from "@/lib/firebase"
@@ -14,13 +14,13 @@ export default function StatisticsCards() {
     totalPatients: 0,
     totalDoctors: 0,
     totalAppointments: 0,
-    roomAvailability: 221, // Keeping this mocked for now
+    totalReceptionists: 0
   })
   const { toast } = useToast()
 
   useEffect(() => {
     let loadedCount = 0
-    const totalLoads = 3 // For patients, doctors, appointments
+    const totalLoads = 4 // Updated for patients, doctors, appointments, receptionists
 
     const checkLoadingComplete = () => {
       loadedCount++
@@ -44,7 +44,7 @@ export default function StatisticsCards() {
         description: "Failed to load patient count.",
         variant: "destructive",
       })
-      checkLoadingComplete() // Ensure loading completes even on error
+      checkLoadingComplete()
     })
 
     const doctorsRef = ref(database, 'doctors')
@@ -62,7 +62,7 @@ export default function StatisticsCards() {
         description: "Failed to load doctor count.",
         variant: "destructive",
       })
-      checkLoadingComplete() // Ensure loading completes even on error
+      checkLoadingComplete()
     })
 
     const appointmentsRef = ref(database, 'appointments')
@@ -80,14 +80,37 @@ export default function StatisticsCards() {
         description: "Failed to load appointment count.",
         variant: "destructive",
       })
-      checkLoadingComplete() // Ensure loading completes even on error
+      checkLoadingComplete()
     })
 
-    // Cleanup listeners on unmount
+    // New listener for receptionists
+    const usersRef = ref(database, 'users')
+    const unsubscribeReceptionists = onValue(usersRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const users = snapshot.val()
+        const receptionistCount = Object.values(users).filter(
+          (user: any) => user.role === 'receptionist'
+        ).length
+        setStats(prev => ({ ...prev, totalReceptionists: receptionistCount }))
+      } else {
+        setStats(prev => ({ ...prev, totalReceptionists: 0 }))
+      }
+      checkLoadingComplete()
+    }, (error) => {
+      console.error("Error fetching receptionists:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load receptionist count.",
+        variant: "destructive",
+      })
+      checkLoadingComplete()
+    })
+
     return () => {
       unsubscribePatients()
       unsubscribeDoctors()
       unsubscribeAppointments()
+      unsubscribeReceptionists()
     }
   }, [toast])
 
@@ -105,7 +128,7 @@ export default function StatisticsCards() {
           <StatCard
             title="Total Patients"
             value={stats.totalPatients}
-            change="↗ 8.5%" // These changes are hardcoded, consider fetching real trends if needed
+            change="↗ 8.5%"
             changeType="positive"
             icon={<Users className="h-6 w-6" />}
             color="blue"
@@ -126,14 +149,14 @@ export default function StatisticsCards() {
             icon={<Calendar className="h-6 w-6" />}
             color="green"
           />
-          <StatCard
-            title="Room Availability"
-            value={stats.roomAvailability}
-            change="↘ 6.2%"
-            changeType="negative"
-            icon={<TrendingUp className="h-6 w-6" />} 
-            color="orange"
-          />
+        <StatCard
+          title="Receptionists" 
+          value={stats.totalReceptionists}
+          change="↗ 5.2%"
+          changeType="positive"
+          icon={<UserCog className="h-6 w-6 text-yellow-500" />} // Added text color class
+          color="yellow"
+        />
         </>
       )}
     </div>

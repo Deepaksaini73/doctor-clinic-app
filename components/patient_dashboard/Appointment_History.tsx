@@ -85,13 +85,13 @@ export default function AppointmentHistory({
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between w-full">
-            <CardTitle className="flex items-center gap-2 text-xl font-semibold flex-shrink-0">
+          <div className="flex flex-col items-start w-full">
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold mb-4 flex-shrink-0">
               <Calendar className="h-6 w-6 text-blue-600" />
               Patients Appointment History
             </CardTitle>
-            <div className="flex items-center gap-3 flex-grow justify-end">
-              <div className="relative flex-1 min-w-[150px]">
+            <div className="flex items-center gap-3 flex-wrap w-full justify-end">
+              <div className="relative flex-1 min-w-[100px]">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search by patient name..."

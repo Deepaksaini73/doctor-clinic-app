@@ -17,7 +17,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { database } from "@/lib/firebase"
 import { ref, push, get, set } from "firebase/database"
 
+// Update the form schema
 const formSchema = z.object({
+  patientType: z.enum(["new", "existing"]),
   patientId: z.string().optional(),
   patientName: z.string().min(2, { message: "Patient name is required" }),
   patientAge: z.coerce
@@ -74,6 +76,7 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      patientType: "new",
       patientId: "",
       patientName: "",
       patientAge: 0,
@@ -307,33 +310,72 @@ export default function AppointmentForm({ transcript, onAppointmentCreated }: Ap
             <div className="space-y-4">
               <FormField
                 control={form.control}
-                name="patientId"
+                name="patientType"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Patient ID (Optional)</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input placeholder="Enter patient ID" {...field} />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handlePatientSearch}
-                        disabled={isSearching}
-                        className="whitespace-nowrap"
+                  <FormItem className="space-y-3">
+                    <FormLabel>Patient Type</FormLabel>
+                    <FormControl>
+                      <RadioGroup 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value} 
+                        className="flex space-x-4"
                       >
-                        {isSearching ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Search className="h-4 w-4" />
-                        )}
-                        <span className="ml-2">Search</span>
-                      </Button>
-                    </div>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="new" />
+                          </FormControl>
+                          <FormLabel className="font-normal">New Patient</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="existing" />
+                          </FormControl>
+                          <FormLabel className="font-normal">Existing Patient</FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {form.watch("patientType") === "existing" && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <FormField
+                    control={form.control}
+                    name="patientId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Search Existing Patient</FormLabel>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter patient ID" 
+                              {...field} 
+                              className="bg-white"
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handlePatientSearch}
+                            disabled={isSearching}
+                            className="whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            {isSearching ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Search className="h-4 w-4" />
+                            )}
+                            <span className="ml-2">Search</span>
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField

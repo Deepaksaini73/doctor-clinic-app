@@ -25,8 +25,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ref, push, set, get } from "firebase/database"
 import { database } from "@/lib/firebase"
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+
+import { handleGetAISuggestions } from "./ai_prescription_component/utils/handlegetAISuggestion"
+import { handleSavePrescription } from "./ai_prescription_component/utils/handleSavePrescription"
+import { prescriptionTemplates, applyTemplate } from "./ai_prescription_component/utils/handleTemplate"
+import { handleExportPDF } from "./ai_prescription_component/utils/handleExportPdf"
 
 interface PrescriptionEditorProps {
   appointment: Appointment | null
@@ -41,8 +44,8 @@ interface PrescriptionEditorProps {
   }
 }
 
-export default function PrescriptionEditor({ 
-  appointment, 
+export default function PrescriptionEditor({
+  appointment,
   symptoms = [],
   onClose,
   isEditing = false,
@@ -82,182 +85,47 @@ export default function PrescriptionEditor({
     }
   }, [appointment])
 
-  const handleGetAISuggestions = async () => {
-    if (!symptoms?.length) {
-      toast({
-        title: "No symptoms",
-        description: "Please add symptoms to get AI suggestions.",
-      });
-      return;
-    }
-
-    setIsSuggesting(true);
-
-    try {
-      // Track suggestions for each symptom
-      const symptomSuggestions = new Map<string, any>();
-      let hasAnyExistingData = false;
-
-      // Check database for each symptom
-      for (const symptom of symptoms) {
-        const symptomRef = ref(database, `symptoms_medicines/${symptom}`);
-        const snapshot = await get(symptomRef);
-        
-        if (snapshot.exists()) {
-          hasAnyExistingData = true;
-          symptomSuggestions.set(symptom, snapshot.val());
-        }
-      }
-
-      // Get doctor-specific prescriptions
-      let doctorSpecificMeds = [];
-      if (appointment?.doctorId) {
-        const doctorPrescriptionsRef = ref(
-          database, 
-          `doctors_prescriptions/${appointment.doctorId}`
-        );
-        const doctorSnapshot = await get(doctorPrescriptionsRef);
-        if (doctorSnapshot.exists()) {
-          const doctorData = doctorSnapshot.val();
-          symptoms.forEach(symptom => {
-            if (doctorData[symptom]?.medicines) {
-              doctorSpecificMeds.push(...doctorData[symptom].medicines);
-            }
-          });
-        }
-      }
-
-      if (hasAnyExistingData || doctorSpecificMeds.length > 0) {
-        // Create weighted medicine scores
-        const medicineScores = new Map<string, {
-          medicine: Medicine,
-          score: number,
-          symptoms: Set<string>
-        }>();
-
-        // Process existing prescriptions for each symptom
-        symptomSuggestions.forEach((medicines, symptom) => {
-          Object.values(medicines).forEach((med: any) => {
-            const key = med.name.toLowerCase();
-            if (!medicineScores.has(key)) {
-              medicineScores.set(key, {
-                medicine: {
-                  name: med.name,
-                  dosage: med.dosage,
-                  frequency: med.frequency,
-                  duration: med.duration,
-                  notes: ""
-                },
-                score: med.count || 1,
-                symptoms: new Set([symptom])
-              });
-            } else {
-              const existing = medicineScores.get(key)!;
-              existing.score += med.count || 1;
-              existing.symptoms.add(symptom);
-            }
-          });
-        });
-
-        // Add doctor-specific medicines with higher weight
-        doctorSpecificMeds.forEach(prescription => {
-          prescription.medicines.forEach(med => {
-            const key = med.name.toLowerCase();
-            if (!medicineScores.has(key)) {
-              medicineScores.set(key, {
-                medicine: med,
-                score: 2,
-                symptoms: new Set()
-              });
-            } else {
-              const existing = medicineScores.get(key)!;
-              existing.score += 2;
-            }
-          });
-        });
-
-        // Sort medicines by score and symptom coverage
-        const sortedMedicines = Array.from(medicineScores.values())
-          .sort((a, b) => {
-            // Prioritize medicines that cover multiple symptoms
-            const symptomDiff = b.symptoms.size - a.symptoms.size;
-            if (symptomDiff !== 0) return symptomDiff;
-            // Then by score
-            return b.score - a.score;
-          })
-          .slice(0, 5) // Take top 5
-          .map(({ medicine }) => medicine);
-
-        // Generate diagnosis based on covered symptoms
-        const coveredSymptoms = new Set<string>();
-        medicineScores.forEach(({ symptoms }) => {
-          symptoms.forEach(s => coveredSymptoms.add(s));
-        });
-
-        let diagnosisText = "Based on analysis of symptoms:\n";
-        symptoms.forEach(symptom => {
-          diagnosisText += `- ${symptom}: ${coveredSymptoms.has(symptom) ? 
-            "Found common treatments" : 
-            "New symptom pattern"}\n`;
-        });
-
-        // Update state with suggested medicines
-        setDiagnosis(diagnosisText);
-        setMedicines(sortedMedicines);
-
-        // If some symptoms weren't found in database, call AI API
-        const uncoveredSymptoms = symptoms.filter(s => !coveredSymptoms.has(s));
-        if (uncoveredSymptoms.length > 0) {
-          const aiResponse = await fetch("/api/medicines", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ symptoms: uncoveredSymptoms })
-          });
-
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            // Append AI suggestions to existing medicines
-            setMedicines(prev => [...prev, ...aiData.medicines]);
-            setDiagnosis(prev => `${prev}\n\nAI Suggestions for new symptoms:\n${aiData.diagnosis}`);
-          }
-        }
-
-        toast({
-          title: "Suggestions Generated",
-          description: `Combined ${coveredSymptoms.size} known patterns${
-            uncoveredSymptoms.length ? " with AI suggestions" : ""
-          }`,
-        });
-      } else {
-        // No existing data, use AI for all symptoms
-        const response = await fetch("/api/medicines", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symptoms })
-        });
-
-        if (!response.ok) throw new Error("Failed to get AI suggestions");
-
-        const data = await response.json();
-        setDiagnosis(data.diagnosis);
-        setMedicines(data.medicines);
-
-        toast({
-          title: "AI Suggestions Generated",
-          description: "Using AI model as no previous prescriptions found",
-        });
-      }
-    } catch (error) {
-      console.error("Error getting suggestions:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get suggestions",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSuggesting(false);
-    }
+  const onClickGetAISuggestions = () => {
+    handleGetAISuggestions({
+      symptoms,
+      appointment,
+      database,
+      setDiagnosis,
+      setMedicines,
+      setIsSuggesting,
+      toast,
+    });
   };
+
+  const onClickSavePrescription = () => {
+    handleSavePrescription({
+      appointment,
+      medicines,
+      diagnosis,
+      instructions,
+      followUp,
+      symptoms,
+      database,
+      toast,
+      setIsLoading,
+      setMedicines,
+      setInstructions,
+      setFollowUp,
+      setIsSaved,
+      onClose,
+      router
+    });
+  };
+  const onClickExportPDF = () => {
+  handleExportPDF({
+    appointment,
+    diagnosis,
+    medicines,
+    instructions,
+    followUp,
+    toast
+  });
+};
 
   // Update handleAddMedicine function
   const handleAddMedicine = () => {
@@ -282,11 +150,11 @@ export default function PrescriptionEditor({
         duration: "",
         notes: "",
       })
-      
+
       // Clear search
       setSearchQuery("")
       setMedicineSearchResults([])
-      
+
       // Close dialog
       setOpen(false)
 
@@ -309,226 +177,25 @@ export default function PrescriptionEditor({
     setMedicines(updatedMedicines)
   }
 
-  const handleSavePrescription = async () => {
-    if (!appointment) return
 
-    if (!medicines.length) {
-      toast({
-        title: "Error",
-        description: "Please add at least one medicine",
-        variant: "destructive"
-      })
-      return
+
+  const handleSearchMedicine = async (query: string) => {
+    setSearchQuery(query);
+
+    if (!query.trim()) {
+      setMedicineSearchResults([]);
+      return;
     }
-
-    if (!diagnosis.trim()) {
-      toast({
-        title: "Error",
-        description: "Please add a diagnosis",
-        variant: "destructive"
-      })
-      return
-    }
-
-    setIsLoading(true)
 
     try {
-      // Check if prescription already exists for this appointment
-      const prescriptionsRef = ref(database, 'prescriptions')
-      const snapshot = await get(prescriptionsRef)
-      
-      let prescriptionId = null
-      if (snapshot.exists()) {
-        const prescriptions = snapshot.val()
-        const existingPrescription = Object.entries(prescriptions).find(
-          ([_, prescription]: [string, any]) => prescription.appointmentId === appointment.id
-        )
-        if (existingPrescription) {
-          prescriptionId = existingPrescription[0]
-        }
-      }
-
-      const prescriptionData = {
-        id: prescriptionId || push(prescriptionsRef).key,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        date: new Date().toISOString(),
-        doctorId: appointment.doctorId,
-        doctorName: appointment.doctorName,
-        doctorAge: appointment.patientAge,
-        diagnosis: diagnosis,
-        medicines: medicines.map(medicine => ({
-          name: medicine.name,
-          dosage: medicine.dosage,
-          frequency: medicine.frequency,
-          duration: medicine.duration,
-          notes: medicine.notes || ''
-        })),
-        instructions,
-        followUp
-      }
-
-      // If prescription exists, update it; otherwise create new
-      const prescriptionRef = ref(database, `prescriptions/${prescriptionId || prescriptionData.id}`)
-      await set(prescriptionRef, prescriptionData)
-
-      // Update appointment status to completed
-      const appointmentRef = ref(database, `appointments/${appointment.id}`)
-      await set(appointmentRef, {
-        ...appointment,
-        status: 'completed'
-      })
-
-      // Update doctor's total patients count
-      const doctorRef = ref(database, `doctors/${appointment.doctorId}`)
-      const doctorSnapshot = await get(doctorRef)
-      
-      if (doctorSnapshot.exists()) {
-        const doctorData = doctorSnapshot.val()
-        const currentTotalPatients = doctorData.totalPatients || 0
-        
-        // Get all appointments for this doctor
-        const appointmentsRef = ref(database, 'appointments')
-        const appointmentsSnapshot = await get(appointmentsRef)
-        
-        if (appointmentsSnapshot.exists()) {
-          const appointments = appointmentsSnapshot.val()
-          // Count unique patients with completed appointments for this doctor
-          const uniquePatients = new Set()
-          
-          Object.values(appointments).forEach((app: any) => {
-            if (app.doctorId === appointment.doctorId && app.status === 'completed') {
-              uniquePatients.add(app.patientId)
-            }
-          })
-          
-          // Update doctor's total patients count
-          await set(doctorRef, {
-            ...doctorData,
-            totalPatients: uniquePatients.size
-          })
-        }
-      }
-
-      const updateSymptomMedicineData = async () => {
-        try {
-          // Get symptoms from the appointment
-          const currentSymptoms = symptoms || [];
-          
-          // Reference to symptoms-medicines mapping
-          const symptomsMedicinesRef = ref(database, 'symptoms_medicines');
-          
-          // For each symptom, update medicine frequencies
-          for (const symptom of currentSymptoms) {
-            const symptomRef = ref(database, `symptoms_medicines/${symptom}`);
-            const symptomSnapshot = await get(symptomRef);
-            const existingData = symptomSnapshot.exists() ? symptomSnapshot.val() : {};
-            
-            // Update frequencies for each medicine
-            for (const medicine of medicines) {
-              const medicineKey = medicine.name.toLowerCase().replace(/\s+/g, '_');
-              existingData[medicineKey] = {
-                name: medicine.name,
-                dosage: medicine.dosage,
-                frequency: medicine.frequency,
-                duration: medicine.duration,
-                count: (existingData[medicineKey]?.count || 0) + 1
-              };
-            }
-            
-            // Save updated data
-            await set(symptomRef, existingData);
-          }
-          
-          // Save doctor-specific prescriptions
-          const doctorPrescriptionsRef = ref(
-            database, 
-            `doctors_prescriptions/${appointment.doctorId}`
-          );
-          
-          const doctorSnapshot = await get(doctorPrescriptionsRef);
-          const doctorPrescriptions = doctorSnapshot.exists() 
-            ? doctorSnapshot.val() 
-            : {};
-          
-          // Update for each symptom
-          for (const symptom of currentSymptoms) {
-            if (!doctorPrescriptions[symptom]) {
-              doctorPrescriptions[symptom] = { medicines: [] };
-            }
-            
-            // Add new prescription data
-            doctorPrescriptions[symptom].medicines.push({
-              diagnosis: diagnosis,
-              medicines: medicines,
-              date: new Date().toISOString(),
-              patientId: appointment.patientId,
-              prescriptionId: prescriptionData.id
-            });
-            
-            // Keep only last 10 prescriptions per symptom
-            if (doctorPrescriptions[symptom].medicines.length > 10) {
-              doctorPrescriptions[symptom].medicines = 
-                doctorPrescriptions[symptom].medicines.slice(-10);
-            }
-          }
-          
-          // Save doctor's prescription history
-          await set(doctorPrescriptionsRef, doctorPrescriptions);
-
-        } catch (error) {
-          console.error("Error updating symptom-medicine data:", error);
-          throw error;
-        }
-      };
-
-      // Update symptom-medicine relationships
-      await updateSymptomMedicineData();
-      
-      toast({
-        title: "Prescription Saved",
-        description: "Prescription and symptom data have been saved successfully.",
-      })
-      
-      // Reset states
-      setMedicines([])
-      setInstructions("")
-      setFollowUp("No follow-up needed")
-      setIsSaved(true)
-      if (onClose) {
-        onClose()
-      }
-      router.refresh()
-
+      const response = await fetch(`/api/medicines/searchmedicines?q=${encodeURIComponent(query)}`);
+      if (!response.ok) throw new Error("Failed to search medicines");
+      const data = await response.json();
+      setMedicineSearchResults(data);  // ✅ should be an array of objects { name, dosage }
     } catch (error) {
-      console.error("Error saving prescription:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save prescription. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+      console.error("Error searching medicines:", error);
     }
-  }
-
-const handleSearchMedicine = async (query: string) => {
-  setSearchQuery(query);
-
-  if (!query.trim()) {
-    setMedicineSearchResults([]);
-    return;
-  }
-
-  try {
-    const response = await fetch(`/api/medicines/searchmedicines?q=${encodeURIComponent(query)}`);
-    if (!response.ok) throw new Error("Failed to search medicines");
-    const data = await response.json();
-    setMedicineSearchResults(data);  // ✅ should be an array of objects { name, dosage }
-  } catch (error) {
-    console.error("Error searching medicines:", error);
-  }
-};
+  };
 
 
   const handleSelectMedicine = (medicine: Medicine) => {
@@ -543,84 +210,37 @@ const handleSearchMedicine = async (query: string) => {
     setMedicineSearchResults([])
   }
 
-  // Template presets for common conditions
-  const prescriptionTemplates = [
-    {
-      name: "Common Cold",
-      medicines: [
-        {
-          name: "Paracetamol",
-          dosage: "500mg",
-          frequency: "Every 6 hours as needed",
-          duration: "5 days",
-        },
-        {
-          name: "Chlorpheniramine",
-          dosage: "4mg",
-          frequency: "Every 8 hours",
-          duration: "5 days",
-        },
-      ],
-      instructions: "Rest and drink plenty of fluids. Avoid cold foods and beverages.",
-      followUp: "Only if symptoms persist after 5 days",
-    },
-    {
-      name: "Migraine",
-      medicines: [
-        {
-          name: "Sumatriptan",
-          dosage: "50mg",
-          frequency: "As needed, max 2 tablets per day",
-          duration: "As needed",
-        },
-        {
-          name: "Ibuprofen",
-          dosage: "400mg",
-          frequency: "Every 6 hours as needed",
-          duration: "3 days",
-        },
-      ],
-      instructions: "Rest in a quiet, dark room. Apply cold compress to forehead if helpful.",
-      followUp: "2 weeks if migraines continue",
-    },
-  ]
 
-  const applyTemplate = (templateName: string) => {
-    const template = prescriptionTemplates.find((t) => t.name === templateName)
-    if (template) {
-      setMedicines(template.medicines)
-      setInstructions(template.instructions)
-      setFollowUp(template.followUp)
-
-      toast({
-        title: "Template Applied",
-        description: `Applied the ${templateName} prescription template.`,
-      })
-    }
-  }
 
   const handleEditMedicine = (index: number) => {
-    setNewMedicine(medicines[index])
-    setEditingMedicineIndex(index)
-    setIsEditDialogOpen(true)
+    const medicineToEdit = medicines[index];
+    setNewMedicine({
+      name: medicineToEdit.name,
+      dosage: medicineToEdit.dosage,
+      frequency: medicineToEdit.frequency,
+      duration: medicineToEdit.duration,
+      notes: medicineToEdit.notes || "",
+    });
+    setEditingMedicineIndex(index);
+    setIsEditDialogOpen(true);
   }
 
   const handleUpdateMedicine = () => {
-    if (editingMedicineIndex === null) return
+    if (editingMedicineIndex === null) return;
 
     if (!newMedicine.name || !newMedicine.dosage || !newMedicine.frequency || !newMedicine.duration) {
       toast({
         title: "Missing information",
         description: "Please fill in all required fields.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     try {
-      const updatedMedicines = [...medicines]
-      updatedMedicines[editingMedicineIndex] = { ...newMedicine }
-      setMedicines(updatedMedicines)
+      const updatedMedicines = [...medicines];
+      updatedMedicines[editingMedicineIndex] = { ...newMedicine };
+      setMedicines(updatedMedicines);
 
       // Reset form and state
       setNewMedicine({
@@ -629,115 +249,21 @@ const handleSearchMedicine = async (query: string) => {
         frequency: "",
         duration: "",
         notes: "",
-      })
-      setEditingMedicineIndex(null)
-      setIsEditDialogOpen(false)
+      });
+      setEditingMedicineIndex(null);
+      setIsEditDialogOpen(false);
 
       toast({
         title: "Success",
         description: "Medicine updated successfully",
-      })
+      });
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to update medicine"
-      })
+      });
     }
-  }
-
-  const handleExportPDF = () => {
-    if (!appointment) return
-
-    const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
-    
-    // Add header
-    doc.setFontSize(20)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Medical Prescription', pageWidth / 2, 20, { align: 'center' })
-    
-    // Add patient info
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Patient Name: ${appointment.patientName}`, 20, 40)
-    doc.text(`Age: ${appointment.patientAge} years`, 20, 50)
-    doc.text(`Gender: ${appointment.gender}`, 20, 60)
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 70)
-    
-    // Add diagnosis
-    doc.setFont('helvetica', 'bold')
-    doc.text('Diagnosis:', 20, 90)
-    doc.setFont('helvetica', 'normal')
-    const diagnosisLines = doc.splitTextToSize(diagnosis, pageWidth - 40)
-    doc.text(diagnosisLines, 20, 100)
-    
-    // Add medicines table
-    doc.setFont('helvetica', 'bold')
-    doc.text('Prescribed Medicines:', 20, 120)
-    
-    const tableData = medicines.map(med => [
-      med.name,
-      med.dosage,
-      med.frequency,
-      med.duration,
-      med.notes || ''
-    ])
-    
-    autoTable(doc, {
-      startY: 130,
-      head: [['Medicine', 'Dosage', 'Frequency', 'Duration', 'Notes']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-      styles: { fontSize: 10 },
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 40 },
-        3: { cellWidth: 30 },
-        4: { cellWidth: 40 }
-      }
-    })
-    
-    // Add instructions
-    const finalY = (doc as any).lastAutoTable.finalY + 10
-    doc.setFont('helvetica', 'bold')
-    doc.text('Instructions:', 20, finalY)
-    doc.setFont('helvetica', 'normal')
-    const instructionLines = doc.splitTextToSize(instructions, pageWidth - 40)
-    doc.text(instructionLines, 20, finalY + 10)
-    
-    // Add follow-up
-    const followUpY = finalY + 20 + (instructionLines.length * 7)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Follow-up:', 20, followUpY)
-    doc.setFont('helvetica', 'normal')
-    doc.text(followUp, 20, followUpY + 10)
-    
-    // Add doctor info
-    doc.setFont('helvetica', 'bold')
-    doc.text('Doctor:', 20, followUpY + 30)
-    doc.setFont('helvetica', 'normal')
-    doc.text(appointment.doctorName, 20, followUpY + 40)
-    
-    // Save the PDF
-    doc.save(`prescription_${appointment.patientName}_${new Date().toISOString().split('T')[0]}.pdf`)
-    
-    toast({
-      title: "PDF Exported",
-      description: "Prescription has been exported successfully.",
-    })
-  }
-
-  if (!appointment) {
-    return (
-      <Card className="h-full flex items-center justify-center border-doctor border-t-4">
-        <CardContent className="text-center py-12">
-          <p className="text-lg text-gray-500">Select an appointment to create a prescription</p>
-        </CardContent>
-      </Card>
-    )
   }
 
   return (
@@ -754,7 +280,7 @@ const handleSearchMedicine = async (query: string) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleGetAISuggestions}
+              onClick={onClickGetAISuggestions}
               disabled={isSuggesting || !(symptoms?.length > 0)}
               className="border-blue-200 hover:bg-blue-50 hover:text-blue-700"
             >
@@ -789,8 +315,8 @@ const handleSearchMedicine = async (query: string) => {
                       variant="outline"
                       className="justify-start hover:bg-gray-50"
                       onClick={() => {
-                        applyTemplate(template.name)
                         setOpen(false)
+                        applyTemplate(template.name, setMedicines, setInstructions, setFollowUp, toast)
                         document.querySelector('[data-state="open"]')?.setAttribute("data-state", "closed")
                       }}
                     >
@@ -903,9 +429,9 @@ const handleSearchMedicine = async (query: string) => {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button 
+                  <Button
                     type="button"
-                    onClick={handleAddMedicine} 
+                    onClick={handleAddMedicine}
                     className="bg-doctor hover:bg-green-700"
                   >
                     Add Medicine
@@ -938,17 +464,17 @@ const handleSearchMedicine = async (query: string) => {
                       <TableCell className="text-gray-600">{medicine.notes}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleEditMedicine(index)}
                             className="hover:bg-blue-50 hover:text-blue-700"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleRemoveMedicine(index)}
                             className="hover:bg-red-50 hover:text-red-700"
                           >
@@ -1000,17 +526,17 @@ const handleSearchMedicine = async (query: string) => {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between border-t bg-gray-50 px-6 py-4">
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="border-gray-200 hover:bg-gray-100"
-          onClick={handleExportPDF}
+          onClick={onClickExportPDF}
           disabled={!medicines.length || !diagnosis.trim()}
         >
           <Download className="mr-2 h-4 w-4" /> Export PDF
         </Button>
-        <Button 
-          onClick={handleSavePrescription} 
-          disabled={isLoading || !medicines.length || !diagnosis.trim()} 
+        <Button
+          onClick={onClickSavePrescription}
+          disabled={isLoading || !medicines.length || !diagnosis.trim()}
           className="bg-doctor hover:bg-green-700"
         >
           {isLoading ? (
@@ -1025,6 +551,92 @@ const handleSearchMedicine = async (query: string) => {
           )}
         </Button>
       </CardFooter>
+
+      {/* Edit Medicine Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="text-black">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Edit Medicine</DialogTitle>
+            <DialogDescription className="text-gray-600">Update medicine details.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-medicine-name" className="text-sm font-medium text-gray-700">Name</Label>
+                <Input
+                  id="edit-medicine-name"
+                  value={newMedicine.name}
+                  onChange={(e) => setNewMedicine({ ...newMedicine, name: e.target.value })}
+                  className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-medicine-dosage" className="text-sm font-medium text-gray-700">Dosage</Label>
+                <Input
+                  id="edit-medicine-dosage"
+                  value={newMedicine.dosage}
+                  onChange={(e) => setNewMedicine({ ...newMedicine, dosage: e.target.value })}
+                  className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-medicine-frequency" className="text-sm font-medium text-gray-700">Frequency</Label>
+                <Input
+                  id="edit-medicine-frequency"
+                  value={newMedicine.frequency}
+                  onChange={(e) => setNewMedicine({ ...newMedicine, frequency: e.target.value })}
+                  className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-medicine-duration" className="text-sm font-medium text-gray-700">Duration</Label>
+                <Input
+                  id="edit-medicine-duration"
+                  value={newMedicine.duration}
+                  onChange={(e) => setNewMedicine({ ...newMedicine, duration: e.target.value })}
+                  className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-medicine-notes" className="text-sm font-medium text-gray-700">Notes (Optional)</Label>
+              <Input
+                id="edit-medicine-notes"
+                value={newMedicine.notes}
+                onChange={(e) => setNewMedicine({ ...newMedicine, notes: e.target.value })}
+                className="mt-1.5 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewMedicine({
+                  name: "",
+                  dosage: "",
+                  frequency: "",
+                  duration: "",
+                  notes: "",
+                });
+                setEditingMedicineIndex(null);
+                setIsEditDialogOpen(false);
+              }}
+              className="mr-2"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateMedicine}
+              className="bg-doctor hover:bg-green-700"
+            >
+              Update Medicine
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

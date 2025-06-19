@@ -174,7 +174,7 @@ export default function DoctorDashboardPage() {
   return (
     <MainLayout 
       title={`Welcome back, ${doctorName || 'Doctor'}!`}  
-      subtitle="Patient management and AI-assisted prescriptions"
+      subtitle="Review patient cases, appointments, and stay updated on treatments."
     >
       <div className="space-y-6">
         {/* Stats Overview */}

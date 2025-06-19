@@ -70,6 +70,64 @@
   inset: 0;
 }
 
+input[type="date"],
+input[type="time"] {
+  color-scheme: light;
+  color: #1e293b; /* slate-800 */
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  background-color: transparent;
+  color: #475569; /* slate-600 */
+  cursor: pointer;
+  height: 20px;
+  width: 20px;
+  display: block;
+  filter: invert(0.4);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.6);
+}
+
+/* Placeholder Styles */
+input::placeholder {
+  color: #94a3b8 !important; /* slate-400 */
+  opacity: 1 !important;
+}
+
+/* Focus Styles */
+input:focus {
+  border-color: #3b82f6 !important; /* blue-500 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Calendar and Time Popup Styles */
+::-webkit-datetime-edit {
+  padding: 0.5rem;
+  color: #1e293b; /* slate-800 */
+}
+
+::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+::-webkit-datetime-edit-text {
+  padding: 0 0.3em;
+  color: #64748b; /* slate-500 */
+}
+
+::-webkit-datetime-edit-month-field,
+::-webkit-datetime-edit-day-field,
+::-webkit-datetime-edit-year-field,
+::-webkit-datetime-edit-hour-field,
+::-webkit-datetime-edit-minute-field,
+::-webkit-datetime-edit-ampm-field {
+  padding: 0 0.15em;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -422,4 +480,22 @@ table td {
 
 .bg-white .text-gray-700 {
   color: #374151 !important;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-area, #printable-area * {
+    visibility: visible;
+  }
+  #printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none;
+  }
 }

@@ -58,7 +58,7 @@ export default function Header({ title, subtitle, userName, userRole }: HeaderPr
 
         <div className="flex items-center gap-2 md:gap-4">
           {/* Search - Hidden on mobile */}
-          <div className="relative hidden lg:block">
+          {/* <div className="relative hidden lg:block">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
@@ -70,12 +70,12 @@ export default function Header({ title, subtitle, userName, userRole }: HeaderPr
                 ⌘K
               </kbd>
             </div>
-          </div>
+          </div> */}
 
           {/* Mobile Search Button */}
-          <Button variant="ghost" size="sm" className="lg:hidden">
+          {/* <Button variant="ghost" size="sm" className="lg:hidden">
             <Search className="h-5 w-5" />
-          </Button>
+          </Button> */}
 
           {/* Notifications */}
           <DropdownMenu>

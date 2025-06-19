@@ -369,7 +369,7 @@ export default function DoctorsPage() {
                               }
                             }
                           }}
-                          placeholder="john.doe@clinicare.com"
+                          placeholder="john.doe@gamil.com"
                         />
                       </div>
                       <div>
