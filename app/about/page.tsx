@@ -10,7 +10,7 @@ const teamMembers = [
   {
     name: "Deepak Saini",
     role: "Frontend Developer",
-    rollNo: "121CE0119",
+    rollNo: "123CE0119",
     image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750315962/deepak_image_dxpubx.jpg", // Add team member images in public/team folder
     github: "https://github.com/Deepaksaini73",
     linkedin: "https://www.linkedin.com/in/deepak-saini-b02bab291/",
@@ -29,7 +29,7 @@ const teamMembers = [
     name: "Shivam Sharma",
     role: "ML Engineer",
     rollNo: "123CR0836",
-    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750338522/shivaang_xxhh7p.jpg",
+    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750348714/shivaang_w2eanl.jpg",
     github: "https://github.com/ShivangSharma26",
     linkedin: "https://www.linkedin.com/in/shivang-sharma-9324512a7/",
     icon: <Brain className="w-6 h-6" />
