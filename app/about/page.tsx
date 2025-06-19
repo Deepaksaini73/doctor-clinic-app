@@ -29,7 +29,7 @@ const teamMembers = [
     name: "Shivam Sharma",
     role: "ML Engineer",
     rollNo: "123CR0836",
-    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750337126/shivaang_zag4pu.png",
+    image: "https://res.cloudinary.com/dpt4bhayi/image/upload/v1750338522/shivaang_xxhh7p.jpg",
     github: "https://github.com/ShivangSharma26",
     linkedin: "https://www.linkedin.com/in/shivang-sharma-9324512a7/",
     icon: <Brain className="w-6 h-6" />
