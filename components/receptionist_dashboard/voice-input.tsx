@@ -55,7 +55,7 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
 
       recognition.onresult = (event: any) => {
         let interimTranscript = "";
-        
+
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const transcriptPiece = event.results[i][0].transcript || "";
           if (event.results[i].isFinal) {
@@ -64,9 +64,9 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
             interimTranscript += transcriptPiece;
           }
         }
-        
+
         const currentTranscript = (finalTranscript + interimTranscript).trim();
-        setTranscript(currentTranscript || "");
+        setTranscript(prev => (prev + " " + currentTranscript).trim());
       };
 
       return () => {
@@ -80,11 +80,10 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
       );
     }
   }, []);
-
   const startRecording = () => {
     try {
       if (recognitionRef.current && !isListening) {
-        setTranscript(""); // Clear transcript when starting new recording
+        // 🚫 DO NOT clear transcript
         recognitionRef.current.start();
       }
     } catch (err) {
@@ -119,59 +118,59 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
   };
 
   const processTranscript = async (text: string) => {
-  if (!text.trim()) {
-    setError("Transcript is empty.");
-    return;
-  }
-
-  setIsProcessing(true);
-  setError(null);
-
-  try {
-    console.log("Sending transcript:", text);
-
-    const response = await fetch("/api/process-voice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript: text }),
-    });
-
-    console.log("API status:", response.status);
-
-    const data = await response.json();
-    console.log("API response:", data);
-
-    if (!response.ok) {
-      throw new Error(data.error || `API returned status ${response.status}`);
+    if (!text.trim()) {
+      setError("Transcript is empty.");
+      return;
     }
 
-    // Validate required fields are present AND non-empty
-    const requiredFields = ["patientName", "patientAge", "gender", "symptoms", "priority"];
-    const missingFields = requiredFields.filter(field => {
-      const value = data[field];
-      return (
-        value === undefined || 
-        value === null || 
-        (typeof value === "string" && value.trim() === "")
-      );
-    });
+    setIsProcessing(true);
+    setError(null);
 
-    if (missingFields.length > 0) {
-      throw new Error(`Missing or empty fields: ${missingFields.join(", ")}`);
+    try {
+      console.log("Sending transcript:", text);
+
+      const response = await fetch("/api/process-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: text }),
+      });
+
+      console.log("API status:", response.status);
+
+      const data = await response.json();
+      console.log("API response:", data);
+
+      if (!response.ok) {
+        throw new Error(data.error || `API returned status ${response.status}`);
+      }
+
+      // Validate required fields are present AND non-empty
+      const requiredFields = ["patientName", "patientAge", "gender", "symptoms", "priority"];
+      const missingFields = requiredFields.filter(field => {
+        const value = data[field];
+        return (
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "")
+        );
+      });
+
+      if (missingFields.length > 0) {
+        throw new Error(`Missing or empty fields: ${missingFields.join(", ")}`);
+      }
+
+      if (typeof onTranscriptComplete === "function") {
+        onTranscriptComplete(data);
+      }
+
+    } catch (err) {
+      console.error("Transcript processing failed:", err);
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(`${msg}. Please try again.`);
+    } finally {
+      setIsProcessing(false);
     }
-
-    if (typeof onTranscriptComplete === "function") {
-      onTranscriptComplete(data);
-    }
-
-  } catch (err) {
-    console.error("Transcript processing failed:", err);
-    const msg = err instanceof Error ? err.message : "Something went wrong";
-    setError(`${msg}. Please try again.`);
-  } finally {
-    setIsProcessing(false);
-  }
-};
+  };
 
 
   const handleSaveTranscript = () => {
@@ -220,16 +219,16 @@ export default function VoiceInput({ onTranscriptComplete }: VoiceInputProps) {
           onChange={(e) => setTranscript(e.target.value || "")}
         />
         <div className="mt-2 text-sm text-gray-500">
-  <p>
-    <strong>Instructions:</strong> Click "Start Recording" and speak clearly. Click "Stop Recording" when finished.
-  </p>
-  <p className="mt-1">
-    <strong>What to say:</strong> Include your name, age, gender, mobile number, symptoms, preferred doctor (if any), and how urgent it is.
-  </p>
-  <p className="mt-1">
-    <strong>Example:</strong> "Hi, my name is Ramesh Verma. I am forty two years old male. My number is nine eight seven six five four three two one zero. I have headache and mild fever. I want to see Dr. Anita Sharma urgently. I have a history of migraine."
-  </p>
-</div>
+          <p>
+            <strong>Instructions:</strong> Click "Start Recording" and speak clearly. Click "Stop Recording" when finished.
+          </p>
+          <p className="mt-1">
+            <strong>What to say:</strong> Include your name, age, gender, mobile number, symptoms, preferred doctor (if any), and how urgent it is.
+          </p>
+          <p className="mt-1">
+            <strong>Example:</strong> "Hi, my name is Ramesh Verma. I am forty two years old male. My number is nine eight seven six five four three two one zero. I have headache and mild fever. I want to see Dr. Anita Sharma urgently. I have a history of migraine."
+          </p>
+        </div>
 
       </CardContent>
       <CardFooter className="flex justify-between">

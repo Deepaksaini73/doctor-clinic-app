@@ -1,4 +1,4 @@
-import jsPDF from "jspdf";
+import jsPDF, { GState } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export interface ExportPDFParams {
@@ -34,7 +34,7 @@ export const handleExportPDF = ({
   // Replace the rotate functionality with a simpler watermark
   doc.setFontSize(60);
   doc.setTextColor(245, 245, 245);
-  doc.setGState(new doc.GState({ opacity: 0.2 }));
+  doc.setGState(new GState({ opacity: 0.2 }));
   doc.text("PRESCRIPTION", pageWidth/2, pageHeight/2, {
     align: "center",
     angle: 45
