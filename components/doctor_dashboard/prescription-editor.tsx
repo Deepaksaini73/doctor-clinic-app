@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import type { Medicine, Appointment } from "@/lib/types"
+import type { Medicine, Appointment, Template } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Plus, Trash2, Save, Download, Sparkles, Check, Pencil } from "lucide-react"
 import {
   Dialog,
@@ -28,7 +29,10 @@ import { database } from "@/lib/firebase"
 
 import { handleGetAISuggestions } from "./ai_prescription_component/utils/handlegetAISuggestion"
 import { handleSavePrescription } from "./ai_prescription_component/utils/handleSavePrescription"
-import { prescriptionTemplates, applyTemplate } from "./ai_prescription_component/utils/handleTemplate"
+import { 
+  applyTemplate,
+  loadDoctorTemplates
+} from "./ai_prescription_component/utils/handleTemplate"
 import { handleExportPDF } from "./ai_prescription_component/utils/handleExportPdf"
 
 interface PrescriptionEditorProps {
@@ -76,6 +80,14 @@ export default function PrescriptionEditor({
   const [editingMedicineIndex, setEditingMedicineIndex] = useState<number | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
+  // Add new state
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false)
+
+  // Add these new states after other state declarations
+  const [availableTemplates, setAvailableTemplates] = useState<Template[]>([])
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
+
   useEffect(() => {
     if (appointment) {
       // Reset prescription when appointment changes
@@ -113,7 +125,8 @@ export default function PrescriptionEditor({
       setFollowUp,
       setIsSaved,
       onClose,
-      router
+      router,
+      saveAsTemplate // Add this line
     });
   };
   const onClickExportPDF = () => {
@@ -266,6 +279,30 @@ export default function PrescriptionEditor({
     }
   }
 
+  // Add this effect to load templates when dialog opens
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!showTemplateDialog || !appointment?.doctorId) return;
+      
+      setIsLoadingTemplates(true);
+      try {
+        const doctorTemplates = await loadDoctorTemplates(appointment.doctorId);
+        setAvailableTemplates(doctorTemplates); // Remove the spread of prescriptionTemplates
+      } catch (error) {
+        console.error("Error loading templates:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load templates",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+
+    fetchTemplates();
+  }, [showTemplateDialog, appointment?.doctorId, toast]);
+
   return (
     <Card className="h-full border-doctor border-t-4 shadow-sm">
       <CardHeader className="bg-gray-50 border-b">
@@ -297,32 +334,62 @@ export default function PrescriptionEditor({
               )}
             </Button>
 
-            <Dialog>
+            {/* Update the Templates Dialog section */}
+            <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="border-green-200 hover:bg-green-50 hover:text-green-700">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="border-green-200 hover:bg-green-50 hover:text-green-700"
+                  onClick={() => setShowTemplateDialog(true)}
+                >
                   Templates
                 </Button>
               </DialogTrigger>
               <DialogContent className="text-black">
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-semibold">Prescription Templates</DialogTitle>
-                  <DialogDescription className="text-gray-600">Select a template to quickly fill the prescription.</DialogDescription>
+                  <DialogTitle className="text-xl font-semibold">Your Prescription Templates</DialogTitle>
+                  <DialogDescription className="text-gray-600">
+                    Select a saved template to quickly fill the prescription.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-3 py-4">
-                  {prescriptionTemplates.map((template) => (
-                    <Button
-                      key={template.name}
-                      variant="outline"
-                      className="justify-start hover:bg-gray-50"
-                      onClick={() => {
-                        setOpen(false)
-                        applyTemplate(template.name, setMedicines, setInstructions, setFollowUp, toast)
-                        document.querySelector('[data-state="open"]')?.setAttribute("data-state", "closed")
-                      }}
-                    >
-                      {template.name}
-                    </Button>
-                  ))}
+                  {isLoadingTemplates ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                  ) : (
+                    <>
+                      {availableTemplates.length > 0 ? (
+                        availableTemplates.map((template) => (
+                          <Button
+                            key={template.id}
+                            variant="outline"
+                            className="justify-start hover:bg-gray-50"
+                            onClick={() => {
+                              setShowTemplateDialog(false);
+                              applyTemplate(
+                                template,
+                                setDiagnosis,
+                                setMedicines,
+                                setInstructions,
+                                setFollowUp,
+                                toast
+                              );
+                            }}
+                          >
+                            <span className="flex items-center gap-2">
+                              {template.name}
+                            </span>
+                          </Button>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-gray-500">
+                          No saved templates available
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -338,6 +405,22 @@ export default function PrescriptionEditor({
             placeholder="Enter the diagnosis"
             className="min-h-[100px] resize-none focus:ring-2 focus:ring-blue-500"
           />
+        </div>
+
+        {/* Add Template Checkbox */}
+        <div className="flex items-center space-x-2 border-t border-gray-100 pt-4">
+          <Checkbox
+            id="saveTemplate"
+            checked={saveAsTemplate}
+            onCheckedChange={(checked) => setSaveAsTemplate(checked as boolean)}
+            className="data-[state=checked]:bg-doctor data-[state=checked]:border-doctor"
+          />
+          <Label
+            htmlFor="saveTemplate"
+            className="text-sm text-gray-600 cursor-pointer select-none"
+          >
+            Save this diagnosis and medicines as a template for future use
+          </Label>
         </div>
 
         <div>

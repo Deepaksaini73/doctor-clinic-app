@@ -1,63 +1,62 @@
 // src/utils/templatesHelpers.ts
+import { ref, get } from 'firebase/database'
+import { database } from '@/lib/firebase'
 
-export const prescriptionTemplates = [
-  {
-    name: "Common Cold",
-    medicines: [
-      {
-        name: "Paracetamol",
-        dosage: "500mg",
-        frequency: "Every 6 hours as needed",
-        duration: "5 days",
-      },
-      {
-        name: "Chlorpheniramine",
-        dosage: "4mg",
-        frequency: "Every 8 hours",
-        duration: "5 days",
-      },
-    ],
-    instructions: "Rest and drink plenty of fluids. Avoid cold foods and beverages.",
-    followUp: "Only if symptoms persist after 5 days",
-  },
-  {
-    name: "Migraine",
-    medicines: [
-      {
-        name: "Sumatriptan",
-        dosage: "50mg",
-        frequency: "As needed, max 2 tablets per day",
-        duration: "As needed",
-      },
-      {
-        name: "Ibuprofen",
-        dosage: "400mg",
-        frequency: "Every 6 hours as needed",
-        duration: "3 days",
-      },
-    ],
-    instructions: "Rest in a quiet, dark room. Apply cold compress to forehead if helpful.",
-    followUp: "2 weeks if migraines continue",
-  },
-];
+interface Medicine {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+}
 
-// Generic helper to apply a template by name
+interface Template {
+  id?: string;
+  doctorId: string;
+  name: string;
+  diagnosis: string;
+  medicines: Medicine[];
+  instructions: string;
+  followUp: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const applyTemplate = (
-  templateName: string,
-  setMedicines: (value: any) => void,
+  template: Template,
+  setDiagnosis: (value: string) => void,
+  setMedicines: (value: Medicine[]) => void,
   setInstructions: (value: string) => void,
   setFollowUp: (value: string) => void,
-  toast: (args: any) => void
+  toast: (args: { title: string; description: string }) => void
 ) => {
-  const template = prescriptionTemplates.find((t) => t.name === templateName);
   if (template) {
+    setDiagnosis(template.diagnosis);
     setMedicines(template.medicines);
     setInstructions(template.instructions);
     setFollowUp(template.followUp);
 
     toast({
       title: "Template Applied",
-      description: `Applied the ${templateName} prescription template.`,
+      description: `Applied template: ${template.name}`,
     });
+  }
+};
+
+export const loadDoctorTemplates = async (doctorId: string): Promise<Template[]> => {
+  try {
+    const templatesRef = ref(database, `doctor_templates/${doctorId}`);
+    const snapshot = await get(templatesRef);
+    
+    if (!snapshot.exists()) return [];
+
+    return Object.entries(snapshot.val()).map(([id, data]: [string, any]) => ({
+      id,
+      ...data,
+      doctorId,
+      name: data.diagnosis // Using diagnosis as template name
+    }));
+  } catch (error) {
+    console.error("Error loading templates:", error);
+    return [];
   }
 };

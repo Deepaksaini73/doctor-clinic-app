@@ -24,6 +24,7 @@ interface SavePrescriptionParams {
   setIsSaved: (value: boolean) => void;
   onClose?: () => void;
   router: any;
+  saveAsTemplate: boolean;
 }
 
 export const handleSavePrescription = async ({
@@ -41,7 +42,8 @@ export const handleSavePrescription = async ({
   setFollowUp,
   setIsSaved,
   onClose,
-  router
+  router,
+  saveAsTemplate
 }: SavePrescriptionParams) => {
     if (!appointment) return
 
@@ -218,6 +220,55 @@ export const handleSavePrescription = async ({
       // Update symptom-medicine relationships
       await updateSymptomMedicineData();
       
+      // Add template saving logic
+      const saveTemplate = async (doctorId: string, prescriptionData: any) => {
+        try {
+          const templatesRef = ref(database, `doctor_templates/${doctorId}`);
+          const snapshot = await get(templatesRef);
+          const templates = snapshot.exists() ? snapshot.val() : {};
+          
+          // Check if template with same diagnosis exists
+          const existingTemplate = Object.entries(templates).find(
+            ([_, template]: [string, any]) => 
+              template.diagnosis.toLowerCase() === prescriptionData.diagnosis.toLowerCase()
+          );
+
+          if (existingTemplate) {
+            // Update existing template
+            await set(ref(database, `doctor_templates/${doctorId}/${existingTemplate[0]}`), {
+              ...prescriptionData,
+              updatedAt: new Date().toISOString()
+            });
+          } else {
+            // Create new template
+            const newTemplateRef = push(ref(database, `doctor_templates/${doctorId}`));
+            await set(newTemplateRef, {
+              ...prescriptionData,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error("Error saving template:", error);
+          throw error;
+        }
+      };
+
+      // Save as template if flag is true
+      if (saveAsTemplate) {
+        await saveTemplate(appointment.doctorId, {
+          diagnosis,
+          medicines,
+          instructions,
+          followUp
+        });
+        
+        toast({
+          title: "Template Saved",
+          description: "Prescription template has been saved for future use."
+        });
+      }
+
       toast({
         title: "Prescription Saved",
         description: "Prescription and symptom data have been saved successfully.",
